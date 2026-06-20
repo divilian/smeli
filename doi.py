@@ -559,6 +559,25 @@ def candidate_score(
     return score, citation_bonus
 
 
+def add_candidate_score(
+    candidate: dict[str, Any],
+    *,
+    author: str | None = None,
+    title: str | None = None,
+    year: str | int | None = None,
+) -> dict[str, Any]:
+    """Attach the local ranking score to a candidate for display/debugging."""
+    score, citation_bonus = candidate_score(
+        candidate,
+        author=author,
+        title=title,
+        year=year,
+    )
+    candidate["score"] = score
+    candidate["citation_score"] = citation_bonus
+    return candidate
+
+
 def get_doi_from_crossref(
     author: str | None = None,
     title: str | None = None,
@@ -592,6 +611,7 @@ def get_doi_from_crossref(
         if not candidate:
             continue
         if candidate_matches(candidate, author=author, title=title, year=year):
+            add_candidate_score(candidate, author=author, title=title, year=year)
             matched.append(candidate)
 
     matched.sort(
@@ -655,6 +675,7 @@ def get_doi_from_openalex(
         if doi_key in seen_dois:
             continue
         seen_dois.add(doi_key)
+        add_candidate_score(candidate, author=author, title=title, year=year)
         matched.append(candidate)
 
     matched.sort(
@@ -704,7 +725,14 @@ def serialize_candidate(
     venue = candidate.get("venue") or candidate.get("publisher") or "[No venue listed]"
     citations = candidate.get("cited_by_count")
 
-    retval = f"{prefix}{title}\n"
+    score_text = ""
+    if candidate.get("score") is not None:
+        score_text = f" [relevance: {candidate.get('score')}"
+        if candidate.get("citation_score") is not None:
+            score_text += f", cites: {candidate.get('citation_score')}"
+        score_text += "]"
+
+    retval = f"{prefix}{title}{score_text}\n"
     retval += f"   {authors} ({year})\n"
     retval += f"   {venue}\n"
     if citations is not None:
@@ -765,7 +793,7 @@ def print_selected_doi_details(doi: str) -> None:
     if bibtex is None:
         print("No BibTeX returned by doi.org content negotiation.")
     else:
-        print(bibtex.strip())
+        print_bibtex(bibtex)
     input("(Press Enter.)")
 
     print("=" * 60)
@@ -867,6 +895,148 @@ def main() -> None:
 
         print("Invalid option. Please try again.")
 
+
+def split_bibtex_fields(body: str) -> list[str]:
+    """
+    Split the inside of a BibTeX entry into top-level field assignments.
+
+    This tries to split on commas that are not inside braces or quotes.
+    It is intentionally simple, but good enough for ordinary doi.org BibTeX.
+    """
+    fields = []
+    current = []
+    brace_depth = 0
+    in_quote = False
+    escaped = False
+
+    for ch in body:
+        current.append(ch)
+
+        if escaped:
+            escaped = False
+            continue
+
+        if ch == "\\":
+            escaped = True
+            continue
+
+        if ch == '"' and brace_depth == 0:
+            in_quote = not in_quote
+            continue
+
+        if not in_quote:
+            if ch == "{":
+                brace_depth += 1
+            elif ch == "}":
+                brace_depth = max(0, brace_depth - 1)
+            elif ch == "," and brace_depth == 0:
+                field = "".join(current[:-1]).strip()
+                if field:
+                    fields.append(field)
+                current = []
+
+    final_field = "".join(current).strip()
+    if final_field:
+        fields.append(final_field)
+
+    return fields
+
+
+def clean_bibtex_value(value: str) -> str:
+    """Remove simple surrounding BibTeX braces/quotes and tidy whitespace."""
+    value = value.strip().rstrip(",")
+
+    if len(value) >= 2:
+        if value[0] == "{" and value[-1] == "}":
+            value = value[1:-1]
+        elif value[0] == '"' and value[-1] == '"':
+            value = value[1:-1]
+
+    value = re.sub(r"\s+", " ", value).strip()
+    return value
+
+
+def parse_bibtex_entry(bibtex: str) -> dict[str, Any] | None:
+    """
+    Parse a single BibTeX entry into a simple dictionary.
+
+    Returns None if the entry does not look like a normal single BibTeX entry.
+    """
+    text = bibtex.strip()
+
+    match = re.match(r"@(\w+)\s*\{\s*([^,]+)\s*,(.*)\}\s*$", text, re.DOTALL)
+    if not match:
+        return None
+
+    entry_type = match.group(1).strip()
+    cite_key = match.group(2).strip()
+    body = match.group(3).strip()
+
+    fields: dict[str, str] = {}
+
+    for field_text in split_bibtex_fields(body):
+        if "=" not in field_text:
+            continue
+
+        key, value = field_text.split("=", 1)
+        key = key.strip().lower()
+        fields[key] = clean_bibtex_value(value)
+
+    return {
+        "entry_type": entry_type,
+        "cite_key": cite_key,
+        "fields": fields,
+    }
+
+
+def print_bibtex(bibtex: str) -> None:
+    """
+    Print a BibTeX entry in a friendlier field-by-field format.
+
+    Also prints the raw BibTeX afterward so the user can copy/paste it into
+    BibTeX-aware tools.
+    """
+    parsed = parse_bibtex_entry(bibtex)
+
+    if parsed is None:
+        print("Could not parse BibTeX cleanly. Raw BibTeX:")
+        print(bibtex.strip())
+        return
+
+    fields = parsed["fields"]
+
+    print("BibTeX entry:")
+    print(f"  type: {parsed['entry_type']}")
+    print(f"  citation key: {parsed['cite_key']}")
+
+    preferred_order = [
+        "title",
+        "author",
+        "editor",
+        "year",
+        "journal",
+        "booktitle",
+        "publisher",
+        "volume",
+        "number",
+        "pages",
+        "doi",
+        "url",
+    ]
+
+    printed = set()
+
+    for key in preferred_order:
+        if key in fields:
+            print(f"  {key}: {fields[key]}")
+            printed.add(key)
+
+    for key in sorted(fields):
+        if key not in printed:
+            print(f"  {key}: {fields[key]}")
+
+    print("\nRaw BibTeX:")
+    print(bibtex.strip())
 
 if __name__ == "__main__":
     main()
