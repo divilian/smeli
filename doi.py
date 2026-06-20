@@ -19,11 +19,12 @@ import os
 import re
 import sys
 import unicodedata
-from dotend import load_dotenv
+from dotenv import load_dotenv
 from pprint import pprint
 from typing import Any
 from urllib.parse import quote
 
+import pydoc
 import requests
 
 load_dotenv()
@@ -36,13 +37,17 @@ DEFAULT_TIMEOUT = 20
 
 # Crossref recommends identifying scripts that use its API. Keeping the email
 # configurable makes the script easier to share later.
-DOI_EMAIL = os.getenv("DOI_EMAIL", "")
+#
+# DOI_EMAIL is the preferred setting name for this script. DOI_PLAY_EMAIL is
+# accepted as an older/backward-compatible name.
+CONTACT_EMAIL = os.getenv("DOI_EMAIL") or os.getenv("DOI_PLAY_EMAIL", "")
 OPENALEX_API_KEY = os.getenv("OPENALEX_API_KEY")
 
 if CONTACT_EMAIL:
     USER_AGENT = f"doi/0.1 (mailto:{CONTACT_EMAIL})"
 else:
     USER_AGENT = "doi/0.1"
+
 DEFAULT_HEADERS = {
     "User-Agent": USER_AGENT,
 }
@@ -398,6 +403,74 @@ def candidate_matches(
     return True
 
 
+def candidate_score(
+    candidate: dict[str, Any],
+    *,
+    author: str | None = None,
+    title: str | None = None,
+    year: str | int | None = None,
+) -> tuple[int, int]:
+    """
+    Return a simple ranking score for a DOI candidate.
+
+    The score is only used after candidate_matches() has already decided that a
+    result is plausible. In other words: matching decides whether to include a
+    candidate; scoring decides which plausible candidates should be shown first.
+    """
+    score = 0
+
+    candidate_title = normalize_for_match(candidate.get("title"))
+    query_title = normalize_for_match(title)
+
+    if query_title:
+        if candidate_title == query_title:
+            score += 100
+        elif candidate_title.startswith(query_title):
+            score += 80
+        elif query_title in candidate_title:
+            score += 60
+
+        # Prefer tight title matches over much longer titles that merely
+        # contain the query as a substring.
+        title_word_gap = abs(
+            len(candidate_title.split()) - len(query_title.split())
+        )
+        score -= min(title_word_gap, 20)
+
+    if author:
+        query_author = normalize_for_match(author)
+        candidate_authors = [
+            normalize_for_match(name)
+            for name in candidate.get("authors", [])
+        ]
+
+        if any(name == query_author for name in candidate_authors):
+            score += 50
+        elif any(query_author in name for name in candidate_authors):
+            score += 40
+
+        # If the user supplied one author, a first-author match is a useful
+        # signal, especially for quick scholarly DOI lookup.
+        if candidate_authors and query_author in candidate_authors[0]:
+            score += 10
+
+    if year and str(candidate.get("year")) == str(year).strip():
+        score += 30
+
+    if candidate.get("doi"):
+        score += 10
+
+    # Very weak tie-breaker. Citation count should not overpower title,
+    # author, or year matching.
+    try:
+        citations = int(candidate.get("cited_by_count") or 0)
+    except (TypeError, ValueError):
+        citations = 0
+    citation_bonus = min(citations, 1000)
+
+    return score, citation_bonus
+
+
 def get_doi_from_crossref(
     author: str | None = None,
     title: str | None = None,
@@ -433,6 +506,10 @@ def get_doi_from_crossref(
         if candidate_matches(candidate, author=author, title=title, year=year):
             matched.append(candidate)
 
+    matched.sort(
+        key=lambda c: candidate_score(c, author=author, title=title, year=year),
+        reverse=True,
+    )
     return matched
 
 
@@ -492,6 +569,10 @@ def get_doi_from_openalex(
         seen_dois.add(doi_key)
         matched.append(candidate)
 
+    matched.sort(
+        key=lambda c: candidate_score(c, author=author, title=title, year=year),
+        reverse=True,
+    )
     return matched
 
 
@@ -523,8 +604,11 @@ def format_authors(authors: list[str], max_authors: int = 4) -> str:
     return ", ".join(authors[:max_authors]) + ", et al."
 
 
-def print_candidate(candidate: dict[str, Any], index: int | None = None) -> None:
-    """Print one structured DOI candidate."""
+def serialize_candidate(
+    candidate: dict[str, Any],
+    index: int | None = None,
+) -> str:
+    """Return one structured DOI candidate."""
     prefix = f"{index}. " if index is not None else ""
     title = candidate.get("title") or "[No title]"
     year = candidate.get("year") or "n.d."
@@ -532,20 +616,22 @@ def print_candidate(candidate: dict[str, Any], index: int | None = None) -> None
     venue = candidate.get("venue") or candidate.get("publisher") or "[No venue listed]"
     citations = candidate.get("cited_by_count")
 
-    print(f"{prefix}{title}")
-    print(f"   {authors} ({year})")
-    print(f"   {venue}")
+    retval = f"{prefix}{title}\n"
+    retval += f"   {authors} ({year})\n"
+    retval += f"   {venue}\n"
     if citations is not None:
-        print(f"   citations: {citations}")
-    print(f"   DOI: {candidate.get('doi')}")
-
+        retval += f"   citations: {citations}\n"
+    if candidate.get("source"):
+        retval += f"   source: {candidate.get('source')}\n"
+    retval += f"   DOI: {candidate.get('doi')}\n"
+    return retval
 
 def print_candidates(candidates: list[dict[str, Any]]) -> None:
     """Print numbered DOI candidates."""
+    output = ""
     for i, candidate in enumerate(candidates, 1):
-        print_candidate(candidate, i)
-        print()
-
+        output += serialize_candidate(candidate, i) + "\n"
+    page_text(output)
 
 def print_selected_doi_details(doi: str) -> None:
     """Print Crossref metadata, ORCIDs, and BibTeX for a selected DOI."""
@@ -562,6 +648,7 @@ def print_selected_doi_details(doi: str) -> None:
         )
     else:
         pprint(metadata)
+    input("(Press Enter.)")
 
     print("\n--- ORCIDs from OpenAlex ---")
     orcids = get_orcids_from_openalex(doi)
@@ -569,6 +656,7 @@ def print_selected_doi_details(doi: str) -> None:
         print("[]")
     else:
         pprint(orcids)
+    input("(Press Enter.)")
 
     print("\n--- BibTeX from doi.org ---")
     bibtex = get_bibtex_from_doi(doi)
@@ -576,6 +664,7 @@ def print_selected_doi_details(doi: str) -> None:
         print("No BibTeX returned by doi.org content negotiation.")
     else:
         print(bibtex.strip())
+    input("(Press Enter.)")
 
     print("=" * 60)
 
@@ -584,6 +673,9 @@ def print_selected_doi_details(doi: str) -> None:
 # CLI Main Loop
 # ---------------------------------------------------------
 
+def page_text(text: str) -> None:
+    """Display long text through the user's pager."""
+    pydoc.pager(text)
 
 def main() -> None:
     """Run the DOI lookup CLI."""
@@ -642,7 +734,9 @@ def main() -> None:
                 print()
                 print_candidates(results)
 
-                doi_choice = input("Choose DOI number (or [q]uit): ").strip().lower()
+                doi_choice = input(
+                    "Choose DOI number (or [q]uit): "
+                ).strip().lower()
 
                 if doi_choice == "q":
                     print_search_data(search_data)
