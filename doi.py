@@ -8,6 +8,7 @@ Search/discovery is primarily done through OpenAlex. Once a DOI is selected,
 the script tries:
 
   - Crossref for structured metadata, when the DOI has a Crossref record
+  - DataCite for structured metadata, when Crossref has no record
   - OpenAlex for author ORCIDs
   - doi.org content negotiation for BibTeX
 
@@ -228,6 +229,34 @@ def author_names_from_openalex(item: dict[str, Any]) -> list[str]:
     return names
 
 
+def author_names_from_datacite(attributes: dict[str, Any]) -> list[str]:
+    """Return creator display names from a DataCite metadata record."""
+    names = []
+    for creator in attributes.get("creators", []):
+        name = creator.get("name")
+        if not name:
+            name = f"{creator.get('givenName', '')} {creator.get('familyName', '')}"
+        name = name.strip()
+        if name:
+            names.append(name)
+    return names
+
+
+def get_title_from_datacite(attributes: dict[str, Any]) -> str:
+    """Return the first title from a DataCite metadata record."""
+    for title in attributes.get("titles", []):
+        title_text = title.get("title", "").strip()
+        if title_text:
+            return title_text
+    return ""
+
+
+def get_type_from_datacite(attributes: dict[str, Any]) -> str:
+    """Return the most useful type string from a DataCite metadata record."""
+    types = attributes.get("types") or {}
+    return types.get("resourceType") or types.get("resourceTypeGeneral") or ""
+
+
 # ---------------------------------------------------------
 # DOI metadata and lookup functions
 # ---------------------------------------------------------
@@ -255,6 +284,7 @@ def get_metadata_from_crossref(doi: str) -> dict[str, Any] | None:
         return None
 
     return {
+        "source": "Crossref",
         "doi": message.get("DOI", doi),
         "title": first(message.get("title"), ""),
         "authors": author_names_from_crossref(message),
@@ -265,6 +295,64 @@ def get_metadata_from_crossref(doi: str) -> dict[str, Any] | None:
         "type": message.get("type", ""),
         "url": message.get("URL", ""),
     }
+
+
+def get_metadata_from_datacite(doi: str) -> dict[str, Any] | None:
+    """
+    Fetch structured metadata for a DOI from DataCite.
+
+    DataCite is a separate DOI registration agency from Crossref. This lookup is
+    useful when a DOI is valid but Crossref does not have a metadata record for
+    it, which is common for datasets, software, preprints, and repository items.
+    """
+    doi = clean_doi(doi)
+    if not doi:
+        return None
+
+    url = f"https://api.datacite.org/dois/{quote_doi_for_path(doi)}"
+    data = fetch_json(url, source="DataCite")
+    if not data:
+        return None
+
+    record = data.get("data")
+    if not isinstance(record, dict):
+        print("DataCite response did not contain the expected data block.")
+        return None
+
+    attributes = record.get("attributes")
+    if not isinstance(attributes, dict):
+        print("DataCite response did not contain the expected metadata attributes.")
+        return None
+
+    return {
+        "source": "DataCite",
+        "doi": attributes.get("doi") or record.get("id") or doi,
+        "title": get_title_from_datacite(attributes),
+        "authors": author_names_from_datacite(attributes),
+        "journal": "",
+        "publisher": attributes.get("publisher", ""),
+        "citations": attributes.get("citationCount", 0),
+        "year": attributes.get("publicationYear"),
+        "type": get_type_from_datacite(attributes),
+        "url": attributes.get("url", ""),
+    }
+
+
+def get_best_structured_metadata(doi: str) -> dict[str, Any] | None:
+    """
+    Fetch structured DOI metadata, trying Crossref first and DataCite second.
+
+    Crossref remains the preferred metadata source for journal/conference-style
+    publications. DataCite is tried only when Crossref has no usable record.
+    """
+    metadata = get_metadata_from_crossref(doi)
+    if metadata is not None:
+        return metadata
+
+    print(
+        "No Crossref metadata found. Checking DataCite as a fallback..."
+    )
+    return get_metadata_from_datacite(doi)
 
 
 def get_bibtex_from_doi(doi: str) -> str | None:
@@ -626,6 +714,7 @@ def serialize_candidate(
     retval += f"   DOI: {candidate.get('doi')}\n"
     return retval
 
+
 def print_candidates(candidates: list[dict[str, Any]]) -> None:
     """Print numbered DOI candidates."""
     output = ""
@@ -633,27 +722,31 @@ def print_candidates(candidates: list[dict[str, Any]]) -> None:
         output += serialize_candidate(candidate, i) + "\n"
     page_text(output)
 
-def print_dict(d):
+
+def print_dict(d: dict[str, Any]) -> None:
     for k, v in d.items():
         print(f"  {k}: {pformat(v)}")
 
-def print_list_of_dicts(ld):
+
+def print_list_of_dicts(ld: list[dict[str, Any]]) -> None:
     for i in ld:
         print_dict(i)
         print()
-    
+
+
 def print_selected_doi_details(doi: str) -> None:
-    """Print Crossref metadata, ORCIDs, and BibTeX for a selected DOI."""
+    """Print structured metadata, ORCIDs, and BibTeX for a selected DOI."""
     print("\n" + "=" * 60)
     print(f"SELECTED DOI: {doi}")
     print("=" * 60)
 
-    print("\n--- Crossref metadata ---")
-    metadata = get_metadata_from_crossref(doi)
+    print("\n--- Structured metadata ---")
+    metadata = get_best_structured_metadata(doi)
     if metadata is None:
         print(
-            "No Crossref metadata found. This may still be a valid DOI; "
-            "it may simply be registered outside Crossref."
+            "No Crossref or DataCite metadata found. This may still be a "
+            "valid DOI; it may simply be registered somewhere else or have "
+            "limited public metadata."
         )
     else:
         print_dict(metadata)
@@ -685,6 +778,7 @@ def print_selected_doi_details(doi: str) -> None:
 def page_text(text: str) -> None:
     """Display long text through the user's pager."""
     pydoc.pager(text)
+
 
 def main() -> None:
     """Run the DOI lookup CLI."""
