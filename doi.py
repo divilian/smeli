@@ -211,9 +211,12 @@ def normalize_for_match(text: str | None) -> str:
     if not text:
         return ""
 
+    # Unescape first so entities such as &eacute; become normal Unicode before
+    # accent stripping. Otherwise "Caf&eacute;" would normalize to "café"
+    # rather than "cafe".
+    text = html.unescape(text)
     text = unicodedata.normalize("NFKD", text)
     text = "".join(ch for ch in text if not unicodedata.combining(ch))
-    text = html.unescape(text)
     text = text.casefold()
     text = re.sub(r"[^\w\s]", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
@@ -252,7 +255,17 @@ def split_words(text: str | None) -> set[str]:
 
 def author_lastish_name(name: str) -> str:
     """Return a useful normalized author token for overlap checks."""
-    normalized = normalize_for_match(name)
+    raw = html.unescape(str(name or "")).strip()
+
+    # Many metadata services use "Family, Given" while others use
+    # "Given Family". Treat the part before a comma as the family-name-ish
+    # token so "Starnini, Michele" overlaps with "Michele Starnini".
+    if "," in raw:
+        normalized_comma_family = normalize_for_match(raw.split(",", 1)[0])
+        if normalized_comma_family:
+            return normalized_comma_family.split()[-1]
+
+    normalized = normalize_for_match(raw)
     if not normalized:
         return ""
     parts = normalized.split()
@@ -982,7 +995,12 @@ def add_best_candidate_score(
     candidate["score"] = best_score[0]
     candidate["citation_score"] = best_score[1]
 
-    if best_variant and best_variant.get("_match_note"):
+    # Prefer a note attached by the search path that actually produced the
+    # candidate. Fall back to the best-scoring query interpretation only when
+    # the source path did not annotate the record.
+    if candidate.get("_match_note"):
+        candidate["match_note"] = candidate["_match_note"]
+    elif best_variant and best_variant.get("_match_note"):
         candidate["match_note"] = best_variant["_match_note"]
 
     return candidate
@@ -1618,14 +1636,18 @@ def get_work_candidates(
             print("  No strict fielded matches. Trying title/author swapped...")
             swapped = {"author": title, "title": author, "year": year, "_match_note": "title/author swapped"}
             search_variants.append(swapped)
+            swapped_candidates: list[dict[str, Any]] = []
             print("    OpenAlex...")
-            candidates.extend(get_work_candidates_from_openalex(author=title, title=author, year=year))
+            swapped_candidates.extend(get_work_candidates_from_openalex(author=title, title=author, year=year))
             print("    Crossref...")
-            candidates.extend(get_work_candidates_from_crossref(author=title, title=author, year=year))
+            swapped_candidates.extend(get_work_candidates_from_crossref(author=title, title=author, year=year))
             print("    DataCite...")
-            candidates.extend(get_work_candidates_from_datacite(author=title, title=author, year=year))
+            swapped_candidates.extend(get_work_candidates_from_datacite(author=title, title=author, year=year))
             print("    arXiv...")
-            candidates.extend(get_work_candidates_from_arxiv(author=title, title=author, year=year))
+            swapped_candidates.extend(get_work_candidates_from_arxiv(author=title, title=author, year=year))
+            for candidate in swapped_candidates:
+                candidate["_match_note"] = "title/author swapped"
+            candidates.extend(swapped_candidates)
 
         # Last resort: treat all supplied words as a broad bibliographic query,
         # then require those words to appear somewhere in title/authors/venue/IDs.
@@ -1635,14 +1657,18 @@ def get_work_candidates(
             if loose_query:
                 print("  No fielded matches. Trying broad all-fields fallback...")
                 search_variants.append({"author": None, "title": loose_query, "year": year, "_match_note": "broad all-fields fallback"})
+                loose_candidates: list[dict[str, Any]] = []
                 print("    OpenAlex...")
-                candidates.extend(get_work_candidates_from_openalex_loose(loose_query, year=year))
+                loose_candidates.extend(get_work_candidates_from_openalex_loose(loose_query, year=year))
                 print("    Crossref...")
-                candidates.extend(get_work_candidates_from_crossref_loose(loose_query, year=year))
+                loose_candidates.extend(get_work_candidates_from_crossref_loose(loose_query, year=year))
                 print("    DataCite...")
-                candidates.extend(get_work_candidates_from_datacite_loose(loose_query, year=year))
+                loose_candidates.extend(get_work_candidates_from_datacite_loose(loose_query, year=year))
                 print("    arXiv...")
-                candidates.extend(get_work_candidates_from_arxiv_loose(loose_query, year=year))
+                loose_candidates.extend(get_work_candidates_from_arxiv_loose(loose_query, year=year))
+                for candidate in loose_candidates:
+                    candidate["_match_note"] = "broad all-fields fallback"
+                candidates.extend(loose_candidates)
 
     merged = merge_candidate_list(candidates)
     for candidate in merged:
@@ -1851,7 +1877,6 @@ def print_selected_work_details(candidate: dict[str, Any]) -> None:
     print_bibtex(generated)
     input("(Press Enter to return to results list.)")
 
-
     print("=" * 60)
 
 
@@ -2030,7 +2055,15 @@ def make_cite_key(candidate: dict[str, Any]) -> str:
     else:
         author_part = "work"
     year = candidate.get("year") or "nd"
-    title_words = list(split_words(candidate.get("title")))[:3]
+
+    # Keep title words in their original order. split_words() returns a set,
+    # which is fine for matching but produces unstable and less readable keys.
+    stop = {"a", "an", "and", "by", "for", "in", "of", "on", "the", "to", "with"}
+    title_words = [
+        word
+        for word in normalize_for_match(candidate.get("title")).split()
+        if len(word) > 2 and word not in stop
+    ][:3]
     title_part = "".join(word[:12] for word in title_words) or "metadata"
     return re.sub(r"[^A-Za-z0-9_:-]", "", f"{author_part}{year}{title_part}")
 
