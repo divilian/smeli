@@ -28,7 +28,7 @@ def test_fetch_response_merges_headers_and_timeout(monkeypatch):
         captured["kwargs"] = kwargs
         return FakeResponse(json_data={"ok": True})
 
-    monkeypatch.setattr(smeli.requests, "get", fake_get)
+    monkeypatch.setattr(smeli.http.requests, "get", fake_get)
     response = smeli.fetch_response("https://example.org", source="test", headers={"Accept": "text/plain"}, timeout=3)
     assert response is not None
     assert captured["kwargs"]["timeout"] == 3
@@ -37,7 +37,7 @@ def test_fetch_response_merges_headers_and_timeout(monkeypatch):
 
 
 def test_fetch_json_returns_none_on_invalid_json(monkeypatch, capsys):
-    monkeypatch.setattr(smeli, "fetch_response", lambda *args, **kwargs: FakeResponse(json_data=ValueError("bad json")))
+    monkeypatch.setattr(smeli.http, "fetch_response", lambda *args, **kwargs: FakeResponse(json_data=ValueError("bad json")))
     assert smeli.fetch_json("https://example.org", source="Broken") is None
     assert "not valid JSON" in capsys.readouterr().out
 
@@ -58,7 +58,7 @@ def test_get_metadata_from_crossref_shapes_response(monkeypatch):
             }
         }
 
-    monkeypatch.setattr(smeli, "fetch_json", fake_fetch_json)
+    monkeypatch.setattr(smeli.sources, "fetch_json", fake_fetch_json)
     metadata = smeli.get_metadata_from_crossref("10.1103/PhysRevLett.124.048301")
     assert metadata["source"] == "Crossref"
     assert metadata["year"] == 2020
@@ -83,7 +83,7 @@ def test_get_metadata_from_datacite_shapes_response(monkeypatch):
             }
         }
 
-    monkeypatch.setattr(smeli, "fetch_json", fake_fetch_json)
+    monkeypatch.setattr(smeli.sources, "fetch_json", fake_fetch_json)
     metadata = smeli.get_metadata_from_datacite("10.48550/arXiv.2507.11521")
     assert metadata["source"] == "DataCite"
     assert metadata["year"] == 2025
@@ -91,8 +91,8 @@ def test_get_metadata_from_datacite_shapes_response(monkeypatch):
 
 
 def test_get_best_structured_metadata_falls_back_to_datacite(monkeypatch):
-    monkeypatch.setattr(smeli, "get_metadata_from_crossref", lambda value: None)
-    monkeypatch.setattr(smeli, "get_metadata_from_datacite", lambda value: {"source": "DataCite", "doi": value})
+    monkeypatch.setattr(smeli.sources, "get_metadata_from_crossref", lambda value: None)
+    monkeypatch.setattr(smeli.sources, "get_metadata_from_datacite", lambda value: {"source": "DataCite", "doi": value})
     assert smeli.get_best_structured_metadata("10.48550/arXiv.2507.11521")["source"] == "DataCite"
 
 
@@ -105,7 +105,7 @@ def test_get_bibtex_from_doi_uses_doi_org_accept_header(monkeypatch):
         captured["headers"] = kwargs.get("headers", {})
         return "@article{key}"
 
-    monkeypatch.setattr(smeli, "fetch_text", fake_fetch_text)
+    monkeypatch.setattr(smeli.sources, "fetch_text", fake_fetch_text)
     assert smeli.get_bibtex_from_doi("10.1234/abc def") == "@article{key}"
     assert captured["url"].endswith("10.1234/abc%20def")
     assert captured["headers"]["Accept"] == "application/x-bibtex"
