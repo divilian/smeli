@@ -1,2 +1,5 @@
 .env
 *.pdf
+__pycache__
+*.egg-info/
+*.egg-info
