@@ -1,9 +1,9 @@
-import doi
+import smeli
 
 
 def test_split_bibtex_fields_does_not_split_inside_braces_or_quotes():
     body = 'title = {A title, with comma}, author = "Doe, Jane and Smith, John", year = {2025}'
-    assert doi.split_bibtex_fields(body) == [
+    assert smeli.split_bibtex_fields(body) == [
         'title = {A title, with comma}',
         'author = "Doe, Jane and Smith, John"',
         'year = {2025}',
@@ -20,7 +20,7 @@ def test_parse_bibtex_entry_extracts_type_key_and_fields():
       url = {https://arxiv.org/abs/2507.11521}
     }
     """
-    parsed = doi.parse_bibtex_entry(bibtex)
+    parsed = smeli.parse_bibtex_entry(bibtex)
     assert parsed["entry_type"] == "article"
     assert parsed["cite_key"] == "starnini2025opinion"
     assert parsed["fields"]["title"] == "Opinion dynamics: Statistical physics and beyond"
@@ -28,7 +28,7 @@ def test_parse_bibtex_entry_extracts_type_key_and_fields():
 
 
 def test_parse_bibtex_entry_returns_none_for_non_entry():
-    assert doi.parse_bibtex_entry("not bibtex") is None
+    assert smeli.parse_bibtex_entry("not bibtex") is None
 
 
 def test_make_cite_key_is_readable_and_stable_enough():
@@ -37,7 +37,7 @@ def test_make_cite_key_is_readable_and_stable_enough():
         "year": 2025,
         "title": "Opinion dynamics: Statistical physics and beyond",
     }
-    cite_key = doi.make_cite_key(candidate)
+    cite_key = smeli.make_cite_key(candidate)
     assert cite_key.startswith("starnini2025")
     assert "opinion" in cite_key
 
@@ -54,7 +54,7 @@ def test_candidate_to_bibtex_includes_arxiv_fields_for_doi_less_arxiv_candidate(
         "arxiv_category": "physics.soc-ph",
         "url": "https://arxiv.org/abs/2507.11521",
     }
-    bibtex = doi.candidate_to_bibtex(candidate)
+    bibtex = smeli.candidate_to_bibtex(candidate)
     assert bibtex.startswith("@misc{")
     assert "eprint = {2507.11521}" in bibtex
     assert "archivePrefix = {arXiv}" in bibtex
@@ -71,7 +71,7 @@ def test_candidate_to_bibtex_includes_doi_when_present():
         "doi": "10.1103/PhysRevLett.124.048301",
         "url": "https://doi.org/10.1103/PhysRevLett.124.048301",
     }
-    bibtex = doi.candidate_to_bibtex(candidate)
+    bibtex = smeli.candidate_to_bibtex(candidate)
     assert bibtex.startswith("@article{")
     assert "journal = {Physical Review Letters}" in bibtex
     assert "doi = {10.1103/PhysRevLett.124.048301}" in bibtex
@@ -79,7 +79,7 @@ def test_candidate_to_bibtex_includes_doi_when_present():
 
 def test_print_bibtex_pretty_prints_and_preserves_raw(capsys):
     bibtex = "@article{key, title = {My Title}, year = {2025}}"
-    doi.print_bibtex(bibtex)
+    smeli.print_bibtex(bibtex)
     output = capsys.readouterr().out
     assert "BibTeX entry:" in output
     assert "type: article" in output

@@ -1,0 +1,18 @@
+[project]
+name = "smeli"
+version = "0.1.0"
+description = "Scholarly MEtadata Lookup Interface."
+requires-python = ">=3.10"
+dependencies = [
+    "requests",
+    "python-dotenv",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+pythonpath = ["."]

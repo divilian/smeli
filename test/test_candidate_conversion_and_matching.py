@@ -1,6 +1,6 @@
 import xml.etree.ElementTree as ET
 
-import doi
+import smeli
 
 
 def test_crossref_item_to_candidate_normalizes_doi_and_metadata():
@@ -15,7 +15,7 @@ def test_crossref_item_to_candidate_normalizes_doi_and_metadata():
         "type": "journal-article",
         "URL": "https://doi.org/10.1103/PhysRevLett.124.048301",
     }
-    candidate = doi.crossref_item_to_candidate(item)
+    candidate = smeli.crossref_item_to_candidate(item)
     assert candidate["doi"] == "10.1103/PhysRevLett.124.048301"
     assert candidate["title"].startswith("Modeling Echo Chambers")
     assert candidate["year"] == 2020
@@ -38,7 +38,7 @@ def test_openalex_item_to_candidate_keeps_doi_less_arxiv_records():
         "cited_by_count": 0,
         "type": "article",
     }
-    candidate = doi.openalex_item_to_candidate(item)
+    candidate = smeli.openalex_item_to_candidate(item)
     assert candidate["doi"] is None
     assert candidate["arxiv_id"] == "2507.11521"
     assert candidate["openalex_id"] == "https://openalex.org/W123"
@@ -59,7 +59,7 @@ def test_datacite_record_to_candidate_extracts_attributes():
             "citationCount": 3,
         },
     }
-    candidate = doi.datacite_record_to_candidate(record)
+    candidate = smeli.datacite_record_to_candidate(record)
     assert candidate["doi"] == "10.48550/arXiv.2507.11521"
     assert candidate["arxiv_id"] == "2507.11521"
     assert candidate["title"].startswith("Opinion dynamics")
@@ -78,7 +78,7 @@ def test_arxiv_entry_to_candidate_parses_atom_entry():
     </entry>
     """
     entry = ET.fromstring(xml)
-    candidate = doi.arxiv_entry_to_candidate(entry)
+    candidate = smeli.arxiv_entry_to_candidate(entry)
     assert candidate["arxiv_id"] == "2507.11521"
     assert candidate["year"] == 2025
     assert candidate["authors"] == ["Michele Starnini"]
@@ -97,7 +97,7 @@ def test_candidate_matching_strict_loose_and_all_fields():
         "openalex_id": "https://openalex.org/W123",
         "url": "https://arxiv.org/abs/2507.11521",
     }
-    assert doi.candidate_matches(candidate, title="opinion dynamics", author="starnini", year="2025")
-    assert not doi.candidate_matches(candidate, title="network science", author="starnini")
-    assert doi.candidate_matches(candidate, title="dynamics beyond", allow_loose_title=True)
-    assert doi.candidate_matches_loose_query(candidate, "starnini opinion dynamics")
+    assert smeli.candidate_matches(candidate, title="opinion dynamics", author="starnini", year="2025")
+    assert not smeli.candidate_matches(candidate, title="network science", author="starnini")
+    assert smeli.candidate_matches(candidate, title="dynamics beyond", allow_loose_title=True)
+    assert smeli.candidate_matches_loose_query(candidate, "starnini opinion dynamics")

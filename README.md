@@ -1,1 +1,3 @@
-# Playing around with DOI services
+# "smeli"
+
+Scholarly MEtadata Lookup Interface
