@@ -28,7 +28,7 @@ def test_candidate_score_rewards_title_author_year_and_identifiers():
 
 def test_add_best_candidate_score_ignores_private_match_note_key():
     candidate = make_candidate()
-    smeli.add_best_candidate_score(
+    smeli.candidates._add_best_candidate_score(
         candidate,
         [
             {"title": "starnini", "author": "opinion dynamics", "year": None},

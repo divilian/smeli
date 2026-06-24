@@ -1,43 +1,65 @@
 """Metadata source lookups and cross-source orchestration."""
 from __future__ import annotations
 
+__all__ = [
+    "get_metadata_from_crossref",
+    "get_metadata_from_datacite",
+    "get_best_structured_metadata",
+    "get_bibtex_from_doi",
+    "get_orcids_from_openalex",
+    "get_orcids_from_crossref",
+    "get_work_candidates_from_crossref",
+    "get_work_candidates_from_openalex",
+    "get_work_candidates_from_datacite",
+    "get_work_candidates_from_arxiv",
+    "get_candidate_from_openalex_id",
+    "get_candidate_from_arxiv_id",
+    "get_candidate_from_doi",
+    "get_work_candidates_from_orcid",
+    "get_work_candidates_from_identifier",
+    "get_work_candidates",
+    "get_doi_from_crossref",
+    "get_doi_from_openalex",
+]
+
+
 import re
 import xml.etree.ElementTree as ET
 from typing import Any
 from urllib.parse import quote
 
-from .config import MAX_CANDIDATES_PER_SOURCE
-from .http import crossref_params, fetch_json, fetch_text, openalex_params
+from .config import _MAX_CANDIDATES_PER_SOURCE
+from .http import _crossref_params, _fetch_json, _fetch_text, _openalex_params
 from .normalize import (
     base_arxiv_id,
     clean_doi,
     extract_arxiv_id,
     extract_orcid,
-    first,
-    get_year_from_crossref,
+    _first,
+    _get_year_from_crossref,
     looks_like_doi,
     looks_like_orcid,
     orcid_url,
-    quote_doi_for_doi_org,
-    quote_doi_for_path,
-    split_words,
+    _quote_doi_for_doi_org,
+    _quote_doi_for_path,
+    _split_words,
 )
 from .candidates import (
-    add_best_candidate_score,
-    add_candidate_score,
-    arxiv_entry_to_candidate,
-    author_names_from_crossref,
-    author_names_from_datacite,
+    _add_best_candidate_score,
+    _add_candidate_score,
+    _arxiv_entry_to_candidate,
+    _author_names_from_crossref,
+    _author_names_from_datacite,
     bibliographic_query,
     canonical_candidate,
-    candidate_matches,
-    candidate_matches_loose_query,
-    crossref_item_to_candidate,
-    datacite_record_to_candidate,
-    get_title_from_datacite,
-    get_type_from_datacite,
+    _candidate_matches,
+    _candidate_matches_loose_query,
+    _crossref_item_to_candidate,
+    _datacite_record_to_candidate,
+    _get_title_from_datacite,
+    _get_type_from_datacite,
     merge_candidate_list,
-    openalex_item_to_candidate,
+    _openalex_item_to_candidate,
 )
 
 
@@ -52,8 +74,8 @@ def get_metadata_from_crossref(doi: str) -> dict[str, Any] | None:
     if not doi:
         return None
 
-    url = f"https://api.crossref.org/works/{quote_doi_for_path(doi)}"
-    data = fetch_json(url, source="Crossref", params=crossref_params())
+    url = f"https://api.crossref.org/works/{_quote_doi_for_path(doi)}"
+    data = _fetch_json(url, source="Crossref", params=_crossref_params())
     if not data:
         return None
 
@@ -65,12 +87,12 @@ def get_metadata_from_crossref(doi: str) -> dict[str, Any] | None:
     return {
         "source": "Crossref",
         "doi": message.get("DOI", doi),
-        "title": first(message.get("title"), ""),
-        "authors": author_names_from_crossref(message),
-        "journal": first(message.get("container-title"), ""),
+        "title": _first(message.get("title"), ""),
+        "authors": _author_names_from_crossref(message),
+        "journal": _first(message.get("container-title"), ""),
         "publisher": message.get("publisher", ""),
         "citations": message.get("is-referenced-by-count", 0),
-        "year": get_year_from_crossref(message),
+        "year": _get_year_from_crossref(message),
         "type": message.get("type", ""),
         "url": message.get("URL", ""),
     }
@@ -87,8 +109,8 @@ def get_metadata_from_datacite(doi: str) -> dict[str, Any] | None:
     if not doi:
         return None
 
-    url = f"https://api.datacite.org/dois/{quote_doi_for_path(doi)}"
-    data = fetch_json(url, source="DataCite", quiet_statuses={404})
+    url = f"https://api.datacite.org/dois/{_quote_doi_for_path(doi)}"
+    data = _fetch_json(url, source="DataCite", quiet_statuses={404})
     if not data:
         return None
 
@@ -105,13 +127,13 @@ def get_metadata_from_datacite(doi: str) -> dict[str, Any] | None:
     return {
         "source": "DataCite",
         "doi": attributes.get("doi") or record.get("id") or doi,
-        "title": get_title_from_datacite(attributes),
-        "authors": author_names_from_datacite(attributes),
+        "title": _get_title_from_datacite(attributes),
+        "authors": _author_names_from_datacite(attributes),
         "journal": "",
         "publisher": attributes.get("publisher", ""),
         "citations": attributes.get("citationCount", 0),
         "year": attributes.get("publicationYear"),
-        "type": get_type_from_datacite(attributes),
+        "type": _get_type_from_datacite(attributes),
         "url": attributes.get("url", ""),
     }
 
@@ -140,9 +162,9 @@ def get_bibtex_from_doi(doi: str) -> str | None:
     if not doi:
         return None
 
-    url = f"https://doi.org/{quote_doi_for_doi_org(doi)}"
+    url = f"https://doi.org/{_quote_doi_for_doi_org(doi)}"
     headers = {"Accept": "application/x-bibtex"}
-    return fetch_text(url, source="doi.org BibTeX", headers=headers)
+    return _fetch_text(url, source="doi.org BibTeX", headers=headers)
 
 def get_orcids_from_openalex(doi: str) -> list[dict[str, str]]:
     """Extract author ORCIDs using OpenAlex."""
@@ -153,7 +175,7 @@ def get_orcids_from_openalex(doi: str) -> list[dict[str, str]]:
     # OpenAlex accepts external IDs in the form doi:<bare-doi>.
     openalex_work_id = quote(f"doi:{doi}", safe=":")
     url = f"https://api.openalex.org/works/{openalex_work_id}"
-    data = fetch_json(url, source="OpenAlex", params=openalex_params())
+    data = _fetch_json(url, source="OpenAlex", params=_openalex_params())
     if not data:
         return []
 
@@ -181,8 +203,8 @@ def get_orcids_from_crossref(doi: str) -> list[dict[str, str]]:
     if not doi:
         return []
 
-    url = f"https://api.crossref.org/works/{quote_doi_for_path(doi)}"
-    data = fetch_json(url, source="Crossref", params=crossref_params())
+    url = f"https://api.crossref.org/works/{_quote_doi_for_path(doi)}"
+    data = _fetch_json(url, source="Crossref", params=_crossref_params())
     if not data:
         return []
 
@@ -206,7 +228,7 @@ def get_work_candidates_from_crossref(
     url = "https://api.crossref.org/works"
 
     params: dict[str, Any] = {
-        "rows": MAX_CANDIDATES_PER_SOURCE,
+        "rows": _MAX_CANDIDATES_PER_SOURCE,
         "query.bibliographic": bibliographic_query(author, title, year),
     }
     if author:
@@ -216,7 +238,7 @@ def get_work_candidates_from_crossref(
     if year:
         params["filter"] = f"from-pub-date:{year},until-pub-date:{year}"
 
-    data = fetch_json(url, source="Crossref", params=crossref_params(params))
+    data = _fetch_json(url, source="Crossref", params=_crossref_params(params))
     if not data:
         return []
 
@@ -224,11 +246,11 @@ def get_work_candidates_from_crossref(
     matched = []
 
     for item in items:
-        candidate = crossref_item_to_candidate(item)
+        candidate = _crossref_item_to_candidate(item)
         if not candidate:
             continue
-        if candidate_matches(candidate, author=author, title=title, year=year, allow_loose_title=True):
-            add_candidate_score(candidate, author=author, title=title, year=year)
+        if _candidate_matches(candidate, author=author, title=title, year=year, allow_loose_title=True):
+            _add_candidate_score(candidate, author=author, title=title, year=year)
             matched.append(candidate)
 
     return matched
@@ -247,7 +269,7 @@ def get_work_candidates_from_openalex(
     url = "https://api.openalex.org/works"
 
     params: dict[str, Any] = {
-        "per-page": MAX_CANDIDATES_PER_SOURCE,
+        "per-page": _MAX_CANDIDATES_PER_SOURCE,
     }
 
     # Prefer title for discovery; fall back to author. If both are present,
@@ -266,7 +288,7 @@ def get_work_candidates_from_openalex(
     if filters:
         params["filter"] = ",".join(filters)
 
-    data = fetch_json(url, source="OpenAlex", params=openalex_params(params))
+    data = _fetch_json(url, source="OpenAlex", params=_openalex_params(params))
     if not data:
         return []
 
@@ -274,12 +296,12 @@ def get_work_candidates_from_openalex(
     matched = []
 
     for item in items:
-        candidate = openalex_item_to_candidate(item)
+        candidate = _openalex_item_to_candidate(item)
         if not candidate:
             continue
-        if not candidate_matches(candidate, author=author, title=title, year=year, allow_loose_title=False):
+        if not _candidate_matches(candidate, author=author, title=title, year=year, allow_loose_title=False):
             continue
-        add_candidate_score(candidate, author=author, title=title, year=year)
+        _add_candidate_score(candidate, author=author, title=title, year=year)
         matched.append(candidate)
 
     return matched
@@ -296,13 +318,13 @@ def get_work_candidates_from_datacite(
         return []
 
     params: dict[str, Any] = {
-        "page[size]": MAX_CANDIDATES_PER_SOURCE,
+        "page[size]": _MAX_CANDIDATES_PER_SOURCE,
         "query": query,
     }
     if year:
         params["publicationYear"] = str(year).strip()
 
-    data = fetch_json(url, source="DataCite", params=params)
+    data = _fetch_json(url, source="DataCite", params=params)
     if not data:
         return []
 
@@ -310,16 +332,16 @@ def get_work_candidates_from_datacite(
     matched = []
 
     for record in records:
-        candidate = datacite_record_to_candidate(record)
+        candidate = _datacite_record_to_candidate(record)
         if not candidate:
             continue
-        if candidate_matches(candidate, author=author, title=title, year=year, allow_loose_title=True):
-            add_candidate_score(candidate, author=author, title=title, year=year)
+        if _candidate_matches(candidate, author=author, title=title, year=year, allow_loose_title=True):
+            _add_candidate_score(candidate, author=author, title=title, year=year)
             matched.append(candidate)
 
     return matched
 
-def arxiv_search_query(author: str | None, title: str | None, year: str | int | None) -> str:
+def _arxiv_search_query(author: str | None, title: str | None, year: str | int | None) -> str:
     """Build an arXiv API search_query string."""
     terms = []
     if title:
@@ -344,14 +366,14 @@ def get_work_candidates_from_arxiv(
 
     url = "https://export.arxiv.org/api/query"
     params = {
-        "search_query": arxiv_search_query(author, title, year),
+        "search_query": _arxiv_search_query(author, title, year),
         "start": 0,
-        "max_results": min(MAX_CANDIDATES_PER_SOURCE, 50),
+        "max_results": min(_MAX_CANDIDATES_PER_SOURCE, 50),
         "sortBy": "relevance",
         "sortOrder": "descending",
     }
 
-    text = fetch_text(url, source="arXiv", params=params)
+    text = _fetch_text(url, source="arXiv", params=params)
     if not text:
         return []
 
@@ -364,11 +386,11 @@ def get_work_candidates_from_arxiv(
     ns = {"atom": "http://www.w3.org/2005/Atom"}
     matched = []
     for entry in root.findall("atom:entry", ns):
-        candidate = arxiv_entry_to_candidate(entry)
+        candidate = _arxiv_entry_to_candidate(entry)
         if not candidate:
             continue
-        if candidate_matches(candidate, author=author, title=title, year=year, allow_loose_title=True):
-            add_candidate_score(candidate, author=author, title=title, year=year)
+        if _candidate_matches(candidate, author=author, title=title, year=year, allow_loose_title=True):
+            _add_candidate_score(candidate, author=author, title=title, year=year)
             matched.append(candidate)
 
     return matched
@@ -385,11 +407,11 @@ def get_candidate_from_openalex_id(openalex_id: str) -> dict[str, Any] | None:
         work_id = value
 
     url = f"https://api.openalex.org/works/{quote(work_id, safe='')}"
-    data = fetch_json(url, source="OpenAlex", params=openalex_params())
+    data = _fetch_json(url, source="OpenAlex", params=_openalex_params())
     if not data:
         return None
 
-    return openalex_item_to_candidate(data)
+    return _openalex_item_to_candidate(data)
 
 def get_candidate_from_arxiv_id(arxiv_id: str) -> dict[str, Any] | None:
     """Fetch a single candidate by arXiv ID."""
@@ -399,7 +421,7 @@ def get_candidate_from_arxiv_id(arxiv_id: str) -> dict[str, Any] | None:
 
     url = "https://export.arxiv.org/api/query"
     params = {"id_list": arxiv_id, "max_results": 1}
-    text = fetch_text(url, source="arXiv", params=params)
+    text = _fetch_text(url, source="arXiv", params=params)
     if not text:
         return None
 
@@ -414,7 +436,7 @@ def get_candidate_from_arxiv_id(arxiv_id: str) -> dict[str, Any] | None:
     if entry is None:
         return None
 
-    return arxiv_entry_to_candidate(entry)
+    return _arxiv_entry_to_candidate(entry)
 
 def get_candidate_from_doi(doi: str) -> dict[str, Any] | None:
     """Build a single candidate around a known DOI, enriched where possible."""
@@ -459,9 +481,9 @@ def get_candidate_from_doi(doi: str) -> dict[str, Any] | None:
     # OpenAlex may have ORCIDs, citation counts, and a better landing page.
     openalex_work_id = quote(f"doi:{doi}", safe=":")
     openalex_url = f"https://api.openalex.org/works/{openalex_work_id}"
-    openalex_data = fetch_json(openalex_url, source="OpenAlex", params=openalex_params())
+    openalex_data = _fetch_json(openalex_url, source="OpenAlex", params=_openalex_params())
     if openalex_data:
-        openalex_candidate = openalex_item_to_candidate(openalex_data)
+        openalex_candidate = _openalex_item_to_candidate(openalex_data)
         if openalex_candidate:
             candidates.append(openalex_candidate)
 
@@ -476,13 +498,13 @@ def get_candidate_from_doi(doi: str) -> dict[str, Any] | None:
             "cited_by_count": 0,
             "type": "",
             "source": "user-supplied DOI",
-            "url": f"https://doi.org/{quote_doi_for_doi_org(doi)}",
+            "url": f"https://doi.org/{_quote_doi_for_doi_org(doi)}",
         })
 
     merged = merge_candidate_list(candidates)
     return merged[0] if merged else None
 
-def get_work_candidates_from_openalex_loose(
+def _get_work_candidates_from_openalex_loose(
     query: str,
     *,
     year: str | int | None = None,
@@ -493,7 +515,7 @@ def get_work_candidates_from_openalex_loose(
 
     url = "https://api.openalex.org/works"
     params: dict[str, Any] = {
-        "per-page": MAX_CANDIDATES_PER_SOURCE,
+        "per-page": _MAX_CANDIDATES_PER_SOURCE,
         "search": query,
     }
 
@@ -505,22 +527,22 @@ def get_work_candidates_from_openalex_loose(
     if filters:
         params["filter"] = ",".join(filters)
 
-    data = fetch_json(url, source="OpenAlex", params=openalex_params(params))
+    data = _fetch_json(url, source="OpenAlex", params=_openalex_params(params))
     if not data:
         return []
 
     matched = []
     for item in data.get("results", []):
-        candidate = openalex_item_to_candidate(item)
+        candidate = _openalex_item_to_candidate(item)
         if not candidate:
             continue
-        if not candidate_matches_loose_query(candidate, query, year=year):
+        if not _candidate_matches_loose_query(candidate, query, year=year):
             continue
         matched.append(candidate)
 
     return matched
 
-def get_work_candidates_from_crossref_loose(
+def _get_work_candidates_from_crossref_loose(
     query: str,
     *,
     year: str | int | None = None,
@@ -531,28 +553,28 @@ def get_work_candidates_from_crossref_loose(
 
     url = "https://api.crossref.org/works"
     params: dict[str, Any] = {
-        "rows": MAX_CANDIDATES_PER_SOURCE,
+        "rows": _MAX_CANDIDATES_PER_SOURCE,
         "query.bibliographic": query,
     }
     if year:
         params["filter"] = f"from-pub-date:{year},until-pub-date:{year}"
 
-    data = fetch_json(url, source="Crossref", params=crossref_params(params))
+    data = _fetch_json(url, source="Crossref", params=_crossref_params(params))
     if not data:
         return []
 
     matched = []
     for item in data.get("message", {}).get("items", []):
-        candidate = crossref_item_to_candidate(item)
+        candidate = _crossref_item_to_candidate(item)
         if not candidate:
             continue
-        if not candidate_matches_loose_query(candidate, query, year=year):
+        if not _candidate_matches_loose_query(candidate, query, year=year):
             continue
         matched.append(candidate)
 
     return matched
 
-def get_work_candidates_from_datacite_loose(
+def _get_work_candidates_from_datacite_loose(
     query: str,
     *,
     year: str | int | None = None,
@@ -563,35 +585,35 @@ def get_work_candidates_from_datacite_loose(
 
     url = "https://api.datacite.org/dois"
     params: dict[str, Any] = {
-        "page[size]": MAX_CANDIDATES_PER_SOURCE,
+        "page[size]": _MAX_CANDIDATES_PER_SOURCE,
         "query": query,
     }
     if year:
         params["publicationYear"] = str(year).strip()
 
-    data = fetch_json(url, source="DataCite", params=params)
+    data = _fetch_json(url, source="DataCite", params=params)
     if not data:
         return []
 
     matched = []
     for record in data.get("data", []):
-        candidate = datacite_record_to_candidate(record)
+        candidate = _datacite_record_to_candidate(record)
         if not candidate:
             continue
-        if not candidate_matches_loose_query(candidate, query, year=year):
+        if not _candidate_matches_loose_query(candidate, query, year=year):
             continue
         matched.append(candidate)
 
     return matched
 
-def arxiv_loose_search_query(query: str) -> str:
+def _arxiv_loose_search_query(query: str) -> str:
     """Build an arXiv all-fields query from significant normalized tokens."""
-    terms = sorted(split_words(query))
+    terms = sorted(_split_words(query))
     if not terms:
         return "all:*"
     return " AND ".join(f'all:"{term}"' for term in terms)
 
-def get_work_candidates_from_arxiv_loose(
+def _get_work_candidates_from_arxiv_loose(
     query: str,
     *,
     year: str | int | None = None,
@@ -602,14 +624,14 @@ def get_work_candidates_from_arxiv_loose(
 
     url = "https://export.arxiv.org/api/query"
     params = {
-        "search_query": arxiv_loose_search_query(query),
+        "search_query": _arxiv_loose_search_query(query),
         "start": 0,
-        "max_results": min(MAX_CANDIDATES_PER_SOURCE, 50),
+        "max_results": min(_MAX_CANDIDATES_PER_SOURCE, 50),
         "sortBy": "relevance",
         "sortOrder": "descending",
     }
 
-    text = fetch_text(url, source="arXiv", params=params)
+    text = _fetch_text(url, source="arXiv", params=params)
     if not text:
         return []
 
@@ -622,10 +644,10 @@ def get_work_candidates_from_arxiv_loose(
     ns = {"atom": "http://www.w3.org/2005/Atom"}
     matched = []
     for entry in root.findall("atom:entry", ns):
-        candidate = arxiv_entry_to_candidate(entry)
+        candidate = _arxiv_entry_to_candidate(entry)
         if not candidate:
             continue
-        if not candidate_matches_loose_query(candidate, query, year=year):
+        if not _candidate_matches_loose_query(candidate, query, year=year):
             continue
         matched.append(candidate)
 
@@ -639,7 +661,7 @@ def get_work_candidates_from_orcid(orcid: str) -> list[dict[str, Any]]:
 
     url = "https://api.openalex.org/works"
     params: dict[str, Any] = {
-        "per-page": MAX_CANDIDATES_PER_SOURCE,
+        "per-page": _MAX_CANDIDATES_PER_SOURCE,
         # OpenAlex works support filtering on the ORCID field nested inside
         # authorships.author. Use the bare ORCID here; using the canonical
         # https://orcid.org/... URL in an author-id filter can produce a 400.
@@ -647,13 +669,13 @@ def get_work_candidates_from_orcid(orcid: str) -> list[dict[str, Any]]:
         "sort": "publication_date:desc",
     }
 
-    data = fetch_json(url, source="OpenAlex", params=openalex_params(params))
+    data = _fetch_json(url, source="OpenAlex", params=_openalex_params(params))
     if not data:
         return []
 
     matched = []
     for item in data.get("results", []):
-        candidate = openalex_item_to_candidate(item)
+        candidate = _openalex_item_to_candidate(item)
         if not candidate:
             continue
         note = f"ORCID {bare_orcid}"
@@ -705,13 +727,13 @@ def get_work_candidates(
     elif query:
         candidates = []
         print("  OpenAlex...")
-        candidates.extend(get_work_candidates_from_openalex_loose(query, year=year))
+        candidates.extend(_get_work_candidates_from_openalex_loose(query, year=year))
         print("  Crossref...")
-        candidates.extend(get_work_candidates_from_crossref_loose(query, year=year))
+        candidates.extend(_get_work_candidates_from_crossref_loose(query, year=year))
         print("  DataCite...")
-        candidates.extend(get_work_candidates_from_datacite_loose(query, year=year))
+        candidates.extend(_get_work_candidates_from_datacite_loose(query, year=year))
         print("  arXiv...")
-        candidates.extend(get_work_candidates_from_arxiv_loose(query, year=year))
+        candidates.extend(_get_work_candidates_from_arxiv_loose(query, year=year))
         for candidate in candidates:
             candidate["_match_note"] = "free-form query"
     else:
@@ -756,20 +778,20 @@ def get_work_candidates(
                 search_variants.append({"author": None, "title": loose_query, "year": year, "_match_note": "broad all-fields fallback"})
                 loose_candidates: list[dict[str, Any]] = []
                 print("    OpenAlex...")
-                loose_candidates.extend(get_work_candidates_from_openalex_loose(loose_query, year=year))
+                loose_candidates.extend(_get_work_candidates_from_openalex_loose(loose_query, year=year))
                 print("    Crossref...")
-                loose_candidates.extend(get_work_candidates_from_crossref_loose(loose_query, year=year))
+                loose_candidates.extend(_get_work_candidates_from_crossref_loose(loose_query, year=year))
                 print("    DataCite...")
-                loose_candidates.extend(get_work_candidates_from_datacite_loose(loose_query, year=year))
+                loose_candidates.extend(_get_work_candidates_from_datacite_loose(loose_query, year=year))
                 print("    arXiv...")
-                loose_candidates.extend(get_work_candidates_from_arxiv_loose(loose_query, year=year))
+                loose_candidates.extend(_get_work_candidates_from_arxiv_loose(loose_query, year=year))
                 for candidate in loose_candidates:
                     candidate["_match_note"] = "broad all-fields fallback"
                 candidates.extend(loose_candidates)
 
     merged = merge_candidate_list(candidates)
     for candidate in merged:
-        add_best_candidate_score(candidate, search_variants)
+        _add_best_candidate_score(candidate, search_variants)
 
     merged.sort(
         key=lambda c: (c.get("score") or 0, c.get("citation_score") or 0),

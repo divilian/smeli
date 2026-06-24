@@ -1,6 +1,18 @@
 """Normalization and identifier helpers for smeli."""
 from __future__ import annotations
 
+__all__ = [
+    "clean_doi",
+    "looks_like_doi",
+    "extract_orcid",
+    "looks_like_orcid",
+    "orcid_url",
+    "extract_arxiv_id",
+    "base_arxiv_id",
+    "make_arxiv_url",
+]
+
+
 import html
 import re
 import unicodedata
@@ -9,7 +21,7 @@ from typing import Any
 from urllib.parse import quote
 
 
-def first(value: Any, default: str = "") -> Any:
+def _first(value: Any, default: str = "") -> Any:
     """Return the first element of a list-like value, or a default."""
     if isinstance(value, list) and value:
         return value[0]
@@ -45,7 +57,7 @@ def looks_like_doi(value: str | None) -> bool:
     doi = clean_doi(value)
     return bool(doi and re.match(r"^10\.\S+/\S+$", doi, re.IGNORECASE))
 
-ORCID_RE = re.compile(r"\b\d{4}-\d{4}-\d{4}-\d{3}[0-9X]\b", re.IGNORECASE)
+_ORCID_RE = re.compile(r"\b\d{4}-\d{4}-\d{4}-\d{3}[0-9X]\b", re.IGNORECASE)
 
 def extract_orcid(value: str | None) -> str | None:
     """Extract and normalize a bare ORCID iD from text/URL, if present."""
@@ -53,7 +65,7 @@ def extract_orcid(value: str | None) -> str | None:
         return None
 
     text = value.strip()
-    match = ORCID_RE.search(text)
+    match = _ORCID_RE.search(text)
     if not match:
         return None
 
@@ -72,7 +84,7 @@ def orcid_url(orcid: str | None) -> str | None:
         return None
     return f"https://orcid.org/{bare}"
 
-def quote_doi_for_path(doi: str) -> str:
+def _quote_doi_for_path(doi: str) -> str:
     """
     Quote a DOI for APIs that place the DOI inside a URL path segment.
 
@@ -81,7 +93,7 @@ def quote_doi_for_path(doi: str) -> str:
     """
     return quote(doi, safe="")
 
-def quote_doi_for_doi_org(doi: str) -> str:
+def _quote_doi_for_doi_org(doi: str) -> str:
     """
     Quote a DOI for doi.org URLs.
 
@@ -90,7 +102,7 @@ def quote_doi_for_doi_org(doi: str) -> str:
     """
     return quote(doi, safe="/:")
 
-def normalize_for_match(text: str | None) -> str:
+def _normalize_for_match(text: str | None) -> str:
     """Normalize text for forgiving-but-still-simple matching."""
     if not text:
         return ""
@@ -106,34 +118,34 @@ def normalize_for_match(text: str | None) -> str:
     text = re.sub(r"\s+", " ", text).strip()
     return text
 
-def contains_normalized(haystack: str | None, needle: str | None) -> bool:
+def _contains_normalized(haystack: str | None, needle: str | None) -> bool:
     """Case/punctuation/whitespace-insensitive substring check."""
-    normalized_haystack = normalize_for_match(haystack)
-    normalized_needle = normalize_for_match(needle)
+    normalized_haystack = _normalize_for_match(haystack)
+    normalized_needle = _normalize_for_match(needle)
     if not normalized_needle:
         return True
     return normalized_needle in normalized_haystack
 
-def title_similarity(a: str | None, b: str | None) -> float:
+def _title_similarity(a: str | None, b: str | None) -> float:
     """Return a simple normalized-title similarity ratio."""
-    na = normalize_for_match(a)
-    nb = normalize_for_match(b)
+    na = _normalize_for_match(a)
+    nb = _normalize_for_match(b)
     if not na or not nb:
         return 0.0
     if na == nb:
         return 1.0
     return SequenceMatcher(None, na, nb).ratio()
 
-def split_words(text: str | None) -> set[str]:
+def _split_words(text: str | None) -> set[str]:
     """Return normalized word tokens, ignoring tiny stop words."""
     stop = {"a", "an", "and", "by", "for", "in", "of", "on", "the", "to", "with"}
     return {
         word
-        for word in normalize_for_match(text).split()
+        for word in _normalize_for_match(text).split()
         if len(word) > 2 and word not in stop
     }
 
-def author_lastish_name(name: str) -> str:
+def _author_lastish_name(name: str) -> str:
     """Return a useful normalized author token for overlap checks."""
     raw = html.unescape(str(name or "")).strip()
 
@@ -141,23 +153,23 @@ def author_lastish_name(name: str) -> str:
     # "Given Family". Treat the part before a comma as the family-name-ish
     # token so "Starnini, Michele" overlaps with "Michele Starnini".
     if "," in raw:
-        normalized_comma_family = normalize_for_match(raw.split(",", 1)[0])
+        normalized_comma_family = _normalize_for_match(raw.split(",", 1)[0])
         if normalized_comma_family:
             return normalized_comma_family.split()[-1]
 
-    normalized = normalize_for_match(raw)
+    normalized = _normalize_for_match(raw)
     if not normalized:
         return ""
     parts = normalized.split()
     return parts[-1]
 
-def author_overlap(a: list[str], b: list[str]) -> bool:
+def _author_overlap(a: list[str], b: list[str]) -> bool:
     """Return True if two author lists share an apparent surname/name token."""
-    a_names = {author_lastish_name(name) for name in a if author_lastish_name(name)}
-    b_names = {author_lastish_name(name) for name in b if author_lastish_name(name)}
+    a_names = {_author_lastish_name(name) for name in a if _author_lastish_name(name)}
+    b_names = {_author_lastish_name(name) for name in b if _author_lastish_name(name)}
     return bool(a_names and b_names and a_names.intersection(b_names))
 
-def get_year_from_crossref(data: dict[str, Any]) -> int | None:
+def _get_year_from_crossref(data: dict[str, Any]) -> int | None:
     """Extract the best available publication year from Crossref metadata."""
     for field in ("published-print", "published-online", "published", "issued"):
         date_parts = data.get(field, {}).get("date-parts")
@@ -165,7 +177,7 @@ def get_year_from_crossref(data: dict[str, Any]) -> int | None:
             return date_parts[0][0]
     return None
 
-def get_year_from_date(value: str | None) -> int | None:
+def _get_year_from_date(value: str | None) -> int | None:
     """Extract a four-digit year from an ISO-ish date string."""
     if not value:
         return None
@@ -214,7 +226,7 @@ def base_arxiv_id(arxiv_id: str | None) -> str | None:
         return None
     return re.sub(r"v\d+$", "", arxiv_id.strip(), flags=re.IGNORECASE)
 
-def find_arxiv_id_in_mapping(mapping: dict[str, Any]) -> str | None:
+def _find_arxiv_id_in_mapping(mapping: dict[str, Any]) -> str | None:
     """Recursively look for an arXiv ID in a nested dict/list structure."""
     for value in mapping.values():
         if isinstance(value, str):
@@ -222,7 +234,7 @@ def find_arxiv_id_in_mapping(mapping: dict[str, Any]) -> str | None:
             if found:
                 return found
         elif isinstance(value, dict):
-            found = find_arxiv_id_in_mapping(value)
+            found = _find_arxiv_id_in_mapping(value)
             if found:
                 return found
         elif isinstance(value, list):
@@ -232,7 +244,7 @@ def find_arxiv_id_in_mapping(mapping: dict[str, Any]) -> str | None:
                     if found:
                         return found
                 elif isinstance(item, dict):
-                    found = find_arxiv_id_in_mapping(item)
+                    found = _find_arxiv_id_in_mapping(item)
                     if found:
                         return found
     return None
@@ -241,7 +253,7 @@ def make_arxiv_url(arxiv_id: str | None) -> str:
     """Return the canonical arXiv abstract URL for an ID."""
     return f"https://arxiv.org/abs/{arxiv_id}" if arxiv_id else ""
 
-def maybe_int(value: Any) -> int | None:
+def _maybe_int(value: Any) -> int | None:
     """Best-effort integer conversion."""
     try:
         if value is None or value == "":

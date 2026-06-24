@@ -3,7 +3,7 @@ import smeli
 
 def test_split_bibtex_fields_does_not_split_inside_braces_or_quotes():
     body = 'title = {A title, with comma}, author = "Doe, Jane and Smith, John", year = {2025}'
-    assert smeli.split_bibtex_fields(body) == [
+    assert smeli.bibtex._split_bibtex_fields(body) == [
         'title = {A title, with comma}',
         'author = "Doe, Jane and Smith, John"',
         'year = {2025}',

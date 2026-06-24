@@ -16,19 +16,19 @@ def test_looks_like_doi_accepts_doi_urls_and_rejects_non_dois():
 
 def test_quote_doi_helpers_use_correct_url_escaping():
     raw = "10.1145/abc def"
-    assert smeli.quote_doi_for_path(raw) == "10.1145%2Fabc%20def"
-    assert smeli.quote_doi_for_doi_org(raw) == "10.1145/abc%20def"
+    assert smeli.normalize._quote_doi_for_path(raw) == "10.1145%2Fabc%20def"
+    assert smeli.normalize._quote_doi_for_doi_org(raw) == "10.1145/abc%20def"
 
 
 def test_normalize_for_match_removes_case_accents_punctuation_and_html():
-    assert smeli.normalize_for_match("Caf&eacute;: Opinion-Dynamics!") == "cafe opinion dynamics"
-    assert smeli.contains_normalized("Opinion dynamics: Statistical physics and beyond", "opinion dynamics")
+    assert smeli.normalize._normalize_for_match("Caf&eacute;: Opinion-Dynamics!") == "cafe opinion dynamics"
+    assert smeli.normalize._contains_normalized("Opinion dynamics: Statistical physics and beyond", "opinion dynamics")
 
 
 def test_title_similarity_and_split_words_are_useful_for_matching():
-    assert smeli.title_similarity("Opinion Dynamics", "opinion dynamics") == 1.0
-    assert smeli.title_similarity("Opinion dynamics: Statistical physics", "Opinion dynamics statistical physics") > 0.85
-    assert smeli.split_words("The opinion dynamics of a network") == {"opinion", "dynamics", "network"}
+    assert smeli.normalize._title_similarity("Opinion Dynamics", "opinion dynamics") == 1.0
+    assert smeli.normalize._title_similarity("Opinion dynamics: Statistical physics", "Opinion dynamics statistical physics") > 0.85
+    assert smeli.normalize._split_words("The opinion dynamics of a network") == {"opinion", "dynamics", "network"}
 
 
 def test_orcid_helpers_accept_bare_prefixed_and_url_forms():

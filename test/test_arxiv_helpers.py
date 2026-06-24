@@ -21,7 +21,7 @@ def test_find_arxiv_id_in_nested_mapping():
             {"landing_page_url": "https://arxiv.org/abs/2507.11521v1"},
         ],
     }
-    assert smeli.find_arxiv_id_in_mapping(mapping) == "2507.11521v1"
+    assert smeli.normalize._find_arxiv_id_in_mapping(mapping) == "2507.11521v1"
 
 
 def test_make_arxiv_url():
@@ -30,7 +30,7 @@ def test_make_arxiv_url():
 
 
 def test_arxiv_loose_search_query_uses_normalized_terms():
-    query = smeli.sources.arxiv_loose_search_query("Starnini opinion dynamics")
+    query = smeli.sources._arxiv_loose_search_query("Starnini opinion dynamics")
     assert 'all:"starnini"' in query
     assert 'all:"opinion"' in query
     assert 'all:"dynamics"' in query

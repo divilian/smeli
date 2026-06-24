@@ -1,32 +1,42 @@
 """Candidate conversion, matching, scoring, and merging."""
 from __future__ import annotations
 
+__all__ = [
+    "canonical_candidate",
+    "candidate_score",
+    "candidates_are_same",
+    "merge_candidates",
+    "merge_candidate_list",
+    "bibliographic_query",
+]
+
+
 import html
 import re
 import xml.etree.ElementTree as ET
 from typing import Any
 
 from .normalize import (
-    author_lastish_name,
-    author_overlap,
+    _author_lastish_name,
+    _author_overlap,
     base_arxiv_id,
     clean_doi,
-    contains_normalized,
+    _contains_normalized,
     extract_arxiv_id,
-    find_arxiv_id_in_mapping,
-    first,
-    get_year_from_crossref,
-    get_year_from_date,
+    _find_arxiv_id_in_mapping,
+    _first,
+    _get_year_from_crossref,
+    _get_year_from_date,
     make_arxiv_url,
-    maybe_int,
-    normalize_for_match,
-    quote_doi_for_doi_org,
-    split_words,
-    title_similarity,
+    _maybe_int,
+    _normalize_for_match,
+    _quote_doi_for_doi_org,
+    _split_words,
+    _title_similarity,
 )
 
 
-def author_names_from_crossref(item: dict[str, Any]) -> list[str]:
+def _author_names_from_crossref(item: dict[str, Any]) -> list[str]:
     """Return author display names from a Crossref item."""
     names = []
     for author in item.get("author", []):
@@ -35,7 +45,7 @@ def author_names_from_crossref(item: dict[str, Any]) -> list[str]:
             names.append(name)
     return names
 
-def author_names_from_openalex(item: dict[str, Any]) -> list[str]:
+def _author_names_from_openalex(item: dict[str, Any]) -> list[str]:
     """Return author display names from an OpenAlex item."""
     names = []
     for authorship in item.get("authorships", []):
@@ -44,7 +54,7 @@ def author_names_from_openalex(item: dict[str, Any]) -> list[str]:
             names.append(name)
     return names
 
-def author_names_from_datacite(attributes: dict[str, Any]) -> list[str]:
+def _author_names_from_datacite(attributes: dict[str, Any]) -> list[str]:
     """Return creator display names from a DataCite metadata record."""
     names = []
     for creator in attributes.get("creators", []):
@@ -56,7 +66,7 @@ def author_names_from_datacite(attributes: dict[str, Any]) -> list[str]:
             names.append(name)
     return names
 
-def get_title_from_datacite(attributes: dict[str, Any]) -> str:
+def _get_title_from_datacite(attributes: dict[str, Any]) -> str:
     """Return the first title from a DataCite metadata record."""
     for title in attributes.get("titles", []):
         title_text = title.get("title", "").strip()
@@ -64,7 +74,7 @@ def get_title_from_datacite(attributes: dict[str, Any]) -> str:
             return html.unescape(title_text)
     return ""
 
-def get_type_from_datacite(attributes: dict[str, Any]) -> str:
+def _get_type_from_datacite(attributes: dict[str, Any]) -> str:
     """Return the most useful type string from a DataCite metadata record."""
     types = attributes.get("types") or {}
     return types.get("resourceType") or types.get("resourceTypeGeneral") or ""
@@ -92,13 +102,13 @@ def canonical_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
         candidate["url"] = make_arxiv_url(candidate["arxiv_id"])
 
     if candidate.get("doi") and not candidate.get("url"):
-        candidate["url"] = f"https://doi.org/{quote_doi_for_doi_org(candidate['doi'])}"
+        candidate["url"] = f"https://doi.org/{_quote_doi_for_doi_org(candidate['doi'])}"
 
     return candidate
 
-def crossref_item_to_candidate(item: dict[str, Any]) -> dict[str, Any] | None:
+def _crossref_item_to_candidate(item: dict[str, Any]) -> dict[str, Any] | None:
     """Convert a Crossref result item into a work candidate dictionary."""
-    title = first(item.get("title"), "")
+    title = _first(item.get("title"), "")
     doi = clean_doi(item.get("DOI"))
     if not title and not doi:
         return None
@@ -108,9 +118,9 @@ def crossref_item_to_candidate(item: dict[str, Any]) -> dict[str, Any] | None:
         "arxiv_id": extract_arxiv_id(item.get("URL", "")),
         "openalex_id": "",
         "title": title,
-        "year": get_year_from_crossref(item),
-        "authors": author_names_from_crossref(item),
-        "venue": first(item.get("container-title"), ""),
+        "year": _get_year_from_crossref(item),
+        "authors": _author_names_from_crossref(item),
+        "venue": _first(item.get("container-title"), ""),
         "publisher": item.get("publisher", ""),
         "cited_by_count": item.get("is-referenced-by-count", 0),
         "type": item.get("type", ""),
@@ -120,7 +130,7 @@ def crossref_item_to_candidate(item: dict[str, Any]) -> dict[str, Any] | None:
     }
     return canonical_candidate(candidate)
 
-def best_openalex_url(item: dict[str, Any]) -> str:
+def _best_openalex_url(item: dict[str, Any]) -> str:
     """Return the best human landing URL in an OpenAlex work record."""
     primary_location = item.get("primary_location") or {}
     landing = primary_location.get("landing_page_url") or ""
@@ -139,15 +149,15 @@ def best_openalex_url(item: dict[str, Any]) -> str:
 
     return item.get("id", "") or ""
 
-def openalex_item_to_candidate(item: dict[str, Any]) -> dict[str, Any] | None:
+def _openalex_item_to_candidate(item: dict[str, Any]) -> dict[str, Any] | None:
     """Convert an OpenAlex work item into a work candidate dictionary."""
     ids = item.get("ids") or {}
     doi = clean_doi(item.get("doi") or ids.get("doi"))
 
     primary_location = item.get("primary_location") or {}
     source = primary_location.get("source") or {}
-    url = best_openalex_url(item)
-    arxiv_id = find_arxiv_id_in_mapping(item)
+    url = _best_openalex_url(item)
+    arxiv_id = _find_arxiv_id_in_mapping(item)
 
     title = item.get("title", "") or item.get("display_name", "") or ""
     if not title and not doi and not arxiv_id:
@@ -159,7 +169,7 @@ def openalex_item_to_candidate(item: dict[str, Any]) -> dict[str, Any] | None:
         "openalex_id": item.get("id", ""),
         "title": title,
         "year": item.get("publication_year"),
-        "authors": author_names_from_openalex(item),
+        "authors": _author_names_from_openalex(item),
         "venue": source.get("display_name", "") or "",
         "publisher": source.get("host_organization_name", "") or "",
         "cited_by_count": item.get("cited_by_count", 0),
@@ -170,33 +180,33 @@ def openalex_item_to_candidate(item: dict[str, Any]) -> dict[str, Any] | None:
     }
     return canonical_candidate(candidate)
 
-def datacite_record_to_candidate(record: dict[str, Any]) -> dict[str, Any] | None:
+def _datacite_record_to_candidate(record: dict[str, Any]) -> dict[str, Any] | None:
     """Convert a DataCite DOI record into a work candidate dictionary."""
     attributes = record.get("attributes") or {}
     doi = clean_doi(attributes.get("doi") or record.get("id"))
-    title = get_title_from_datacite(attributes)
+    title = _get_title_from_datacite(attributes)
     if not title and not doi:
         return None
 
     url = attributes.get("url") or ""
     candidate = {
         "doi": doi,
-        "arxiv_id": extract_arxiv_id(url) or find_arxiv_id_in_mapping(attributes),
+        "arxiv_id": extract_arxiv_id(url) or _find_arxiv_id_in_mapping(attributes),
         "openalex_id": "",
         "title": title,
         "year": attributes.get("publicationYear"),
-        "authors": author_names_from_datacite(attributes),
+        "authors": _author_names_from_datacite(attributes),
         "venue": attributes.get("container", {}).get("title", "") if isinstance(attributes.get("container"), dict) else "",
         "publisher": attributes.get("publisher", ""),
         "cited_by_count": attributes.get("citationCount", 0),
-        "type": get_type_from_datacite(attributes),
+        "type": _get_type_from_datacite(attributes),
         "source": "DataCite",
         "id": record.get("id", ""),
         "url": url,
     }
     return canonical_candidate(candidate)
 
-def arxiv_entry_to_candidate(entry: ET.Element) -> dict[str, Any] | None:
+def _arxiv_entry_to_candidate(entry: ET.Element) -> dict[str, Any] | None:
     """Convert an arXiv Atom feed entry into a work candidate dictionary."""
     ns = {
         "atom": "http://www.w3.org/2005/Atom",
@@ -210,7 +220,7 @@ def arxiv_entry_to_candidate(entry: ET.Element) -> dict[str, Any] | None:
     title = re.sub(r"\s+", " ", text("atom:title")).strip()
     arxiv_url = text("atom:id")
     arxiv_id = extract_arxiv_id(arxiv_url)
-    year = get_year_from_date(text("atom:published"))
+    year = _get_year_from_date(text("atom:published"))
 
     authors = []
     for author in entry.findall("atom:author", ns):
@@ -244,7 +254,7 @@ def arxiv_entry_to_candidate(entry: ET.Element) -> dict[str, Any] | None:
     }
     return canonical_candidate(candidate)
 
-def candidate_matches(
+def _candidate_matches(
     candidate: dict[str, Any],
     *,
     author: str | None = None,
@@ -255,16 +265,16 @@ def candidate_matches(
     """Apply local matching to a structured work candidate."""
     if title:
         if allow_loose_title:
-            query_words = split_words(title)
-            candidate_words = split_words(candidate.get("title"))
+            query_words = _split_words(title)
+            candidate_words = _split_words(candidate.get("title"))
             if query_words and not query_words.intersection(candidate_words):
                 return False
-        elif not contains_normalized(candidate.get("title"), title):
+        elif not _contains_normalized(candidate.get("title"), title):
             return False
 
     if author:
         authors = candidate.get("authors", [])
-        if not any(contains_normalized(name, author) for name in authors):
+        if not any(_contains_normalized(name, author) for name in authors):
             return False
 
     if year:
@@ -273,7 +283,7 @@ def candidate_matches(
 
     return True
 
-def candidate_search_text(candidate: dict[str, Any]) -> str:
+def _candidate_search_text(candidate: dict[str, Any]) -> str:
     """Return a broad text blob for loose all-fields matching."""
     parts: list[str] = []
     for key in ("title", "venue", "publisher", "type", "doi", "arxiv_id", "openalex_id", "url"):
@@ -283,7 +293,7 @@ def candidate_search_text(candidate: dict[str, Any]) -> str:
     parts.extend(str(name) for name in candidate.get("authors", []) if name)
     return " ".join(parts)
 
-def candidate_matches_loose_query(
+def _candidate_matches_loose_query(
     candidate: dict[str, Any],
     query: str | None,
     *,
@@ -299,11 +309,11 @@ def candidate_matches_loose_query(
     if year and str(candidate.get("year")) != str(year).strip():
         return False
 
-    query_words = split_words(query)
+    query_words = _split_words(query)
     if not query_words:
         return True
 
-    candidate_words = split_words(candidate_search_text(candidate))
+    candidate_words = _split_words(_candidate_search_text(candidate))
     if not candidate_words:
         return False
 
@@ -331,11 +341,11 @@ def candidate_score(
     """
     score = 0
 
-    candidate_title = normalize_for_match(candidate.get("title"))
-    query_title = normalize_for_match(title)
+    candidate_title = _normalize_for_match(candidate.get("title"))
+    query_title = _normalize_for_match(title)
 
     if query_title:
-        similarity = title_similarity(candidate_title, query_title)
+        similarity = _title_similarity(candidate_title, query_title)
         if candidate_title == query_title:
             score += 100
         elif candidate_title.startswith(query_title):
@@ -347,7 +357,7 @@ def candidate_score(
         elif similarity >= 0.75:
             score += 45
         else:
-            shared = split_words(candidate_title).intersection(split_words(query_title))
+            shared = _split_words(candidate_title).intersection(_split_words(query_title))
             score += min(35, len(shared) * 8)
 
         # Prefer tight title matches over much longer titles that merely
@@ -358,9 +368,9 @@ def candidate_score(
         score -= min(title_word_gap, 25)
 
     if author:
-        query_author = normalize_for_match(author)
+        query_author = _normalize_for_match(author)
         candidate_authors = [
-            normalize_for_match(name)
+            _normalize_for_match(name)
             for name in candidate.get("authors", [])
         ]
 
@@ -399,7 +409,7 @@ def candidate_score(
 
     return score, citation_bonus
 
-def add_candidate_score(
+def _add_candidate_score(
     candidate: dict[str, Any],
     *,
     author: str | None = None,
@@ -417,7 +427,7 @@ def add_candidate_score(
     candidate["citation_score"] = citation_bonus
     return candidate
 
-def add_best_candidate_score(
+def _add_best_candidate_score(
     candidate: dict[str, Any],
     search_variants: list[dict[str, Any]],
 ) -> dict[str, Any]:
@@ -475,7 +485,7 @@ def candidates_are_same(a: dict[str, Any], b: dict[str, Any]) -> bool:
     if a.get("year") and b.get("year") and str(a.get("year")) != str(b.get("year")):
         return False
 
-    similar_title = title_similarity(a.get("title"), b.get("title")) >= 0.92
+    similar_title = _title_similarity(a.get("title"), b.get("title")) >= 0.92
     if not similar_title:
         return False
 
@@ -484,7 +494,7 @@ def candidates_are_same(a: dict[str, Any], b: dict[str, Any]) -> bool:
     authors_a = a.get("authors", [])
     authors_b = b.get("authors", [])
     if authors_a and authors_b:
-        return author_overlap(authors_a, authors_b)
+        return _author_overlap(authors_a, authors_b)
 
     return True
 
@@ -510,23 +520,23 @@ def merge_candidates(primary: dict[str, Any], secondary: dict[str, Any]) -> dict
 
     # Prefer a longer, more complete title if the current one is suspiciously short.
     if len(str(secondary.get("title") or "")) > len(str(merged.get("title") or "")) + 10:
-        if title_similarity(merged.get("title"), secondary.get("title")) >= 0.85:
+        if _title_similarity(merged.get("title"), secondary.get("title")) >= 0.85:
             merged["title"] = secondary["title"]
 
     if not merged.get("authors") and secondary.get("authors"):
         merged["authors"] = secondary["authors"]
     elif merged.get("authors") and secondary.get("authors"):
         names = list(merged["authors"])
-        seen = {normalize_for_match(name) for name in names}
+        seen = {_normalize_for_match(name) for name in names}
         for name in secondary["authors"]:
-            if normalize_for_match(name) not in seen:
+            if _normalize_for_match(name) not in seen:
                 names.append(name)
-                seen.add(normalize_for_match(name))
+                seen.add(_normalize_for_match(name))
         merged["authors"] = names
 
     merged["cited_by_count"] = max(
-        maybe_int(merged.get("cited_by_count")) or 0,
-        maybe_int(secondary.get("cited_by_count")) or 0,
+        _maybe_int(merged.get("cited_by_count")) or 0,
+        _maybe_int(secondary.get("cited_by_count")) or 0,
     )
 
     sources = []

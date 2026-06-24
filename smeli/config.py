@@ -1,30 +1,33 @@
 """Configuration for smeli."""
 from __future__ import annotations
 
+__all__: list[str] = []
+
+
 import os
 
 try:
-    from dotenv import load_dotenv
+    from dotenv import load_dotenv as _load_dotenv
 except ImportError:  # pragma: no cover - tiny optional dependency guard
-    def load_dotenv(*args, **kwargs):
+    def _load_dotenv(*args, **kwargs):
         return False
 
-load_dotenv()
+_load_dotenv()
 
-DEFAULT_TIMEOUT = 20
-MAX_CANDIDATES_PER_SOURCE = 50
-MAX_DISPLAY_CANDIDATES = 30
+_DEFAULT_TIMEOUT = 20
+_MAX_CANDIDATES_PER_SOURCE = 50
+_MAX_DISPLAY_CANDIDATES = 30
 
-CONTACT_EMAIL = os.getenv("DOI_EMAIL") or os.getenv("DOI_PLAY_EMAIL", "")
-OPENALEX_API_KEY = os.getenv("OPENALEX_API_KEY")
+_CONTACT_EMAIL = os.getenv("DOI_EMAIL") or os.getenv("DOI_PLAY_EMAIL", "")
+_OPENALEX_API_KEY = os.getenv("OPENALEX_API_KEY")
 
-if CONTACT_EMAIL:
-    USER_AGENT = f"smeli/0.1 (mailto:{CONTACT_EMAIL})"
+if _CONTACT_EMAIL:
+    _USER_AGENT = f"smeli/0.1 (mailto:{_CONTACT_EMAIL})"
 else:
-    USER_AGENT = "smeli/0.1"
+    _USER_AGENT = "smeli/0.1"
 
-DEFAULT_HEADERS = {
-    "User-Agent": USER_AGENT,
+_DEFAULT_HEADERS = {
+    "User-Agent": _USER_AGENT,
 }
 
 

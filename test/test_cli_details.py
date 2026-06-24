@@ -21,7 +21,7 @@ def test_doi_work_uses_doi_org_bibtex_without_generated_fallback(monkeypatch, ca
         lambda doi: "@article{Davies_2011, title = {Still building the memex}, year = {2011}}",
     )
 
-    cli.print_selected_work_details(candidate, pause_at_end=False)
+    cli._print_selected_work_details(candidate, pause_at_end=False)
 
     output = capsys.readouterr().out
     assert "--- BibTeX from doi.org ---" in output
@@ -45,7 +45,7 @@ def test_doi_work_generates_bibtex_when_doi_org_has_no_bibtex(monkeypatch, capsy
     monkeypatch.setattr(cli, "get_orcids_from_openalex", lambda doi: [])
     monkeypatch.setattr(cli, "get_bibtex_from_doi", lambda doi: None)
 
-    cli.print_selected_work_details(candidate, pause_at_end=False)
+    cli._print_selected_work_details(candidate, pause_at_end=False)
 
     output = capsys.readouterr().out
     assert "No BibTeX returned by doi.org content negotiation." in output
@@ -65,7 +65,7 @@ def test_doi_less_work_prints_generated_bibtex(monkeypatch, capsys):
 
     monkeypatch.setattr(builtins, "input", lambda prompt="": "")
 
-    cli.print_selected_work_details(candidate, pause_at_end=False)
+    cli._print_selected_work_details(candidate, pause_at_end=False)
 
     output = capsys.readouterr().out
     assert "DOI-specific enrichment skipped" in output

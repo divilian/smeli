@@ -1,14 +1,22 @@
 """BibTeX parsing, pretty-printing, and generation."""
 from __future__ import annotations
 
+__all__ = [
+    "parse_bibtex_entry",
+    "print_bibtex",
+    "make_cite_key",
+    "candidate_to_bibtex",
+]
+
+
 import html
 import re
 from typing import Any
 
-from .normalize import author_lastish_name, normalize_for_match
+from .normalize import _author_lastish_name, _normalize_for_match
 
 
-def split_bibtex_fields(body: str) -> list[str]:
+def _split_bibtex_fields(body: str) -> list[str]:
     """
     Split the inside of a BibTeX entry into top-level field assignments.
 
@@ -53,7 +61,7 @@ def split_bibtex_fields(body: str) -> list[str]:
 
     return fields
 
-def clean_bibtex_value(value: str) -> str:
+def _clean_bibtex_value(value: str) -> str:
     """Remove simple surrounding BibTeX braces/quotes and tidy whitespace."""
     value = value.strip().rstrip(",")
 
@@ -84,13 +92,13 @@ def parse_bibtex_entry(bibtex: str) -> dict[str, Any] | None:
 
     fields: dict[str, str] = {}
 
-    for field_text in split_bibtex_fields(body):
+    for field_text in _split_bibtex_fields(body):
         if "=" not in field_text:
             continue
 
         key, value = field_text.split("=", 1)
         key = key.strip().lower()
-        fields[key] = clean_bibtex_value(value)
+        fields[key] = _clean_bibtex_value(value)
 
     return {
         "entry_type": entry_type,
@@ -150,7 +158,7 @@ def print_bibtex(bibtex: str) -> None:
     print("\nRaw BibTeX:")
     print(bibtex.strip())
 
-def bibtex_escape(value: Any) -> str:
+def _bibtex_escape(value: Any) -> str:
     """Very small BibTeX escaping/tidying helper."""
     text = str(value or "")
     text = html.unescape(text)
@@ -162,7 +170,7 @@ def make_cite_key(candidate: dict[str, Any]) -> str:
     """Create a compact citation key from first-author surname and year."""
     authors = candidate.get("authors") or []
     if authors:
-        author_part = author_lastish_name(authors[0]) or "work"
+        author_part = _author_lastish_name(authors[0]) or "work"
     else:
         author_part = "work"
 
@@ -177,7 +185,7 @@ def candidate_to_bibtex(candidate: dict[str, Any]) -> str:
         entry_type = "misc"
     elif candidate.get("type") in {"book", "monograph"}:
         entry_type = "book"
-    elif candidate.get("venue") and "proceed" in normalize_for_match(candidate.get("venue")):
+    elif candidate.get("venue") and "proceed" in _normalize_for_match(candidate.get("venue")):
         entry_type = "inproceedings"
 
     fields: list[tuple[str, Any]] = []
@@ -212,6 +220,6 @@ def candidate_to_bibtex(candidate: dict[str, Any]) -> str:
     cite_key = make_cite_key(candidate)
     lines = [f"@{entry_type}{{{cite_key},"]
     for key, value in fields:
-        lines.append(f"  {key} = {{{bibtex_escape(value)}}},")
+        lines.append(f"  {key} = {{{_bibtex_escape(value)}}},")
     lines.append("}")
     return "\n".join(lines)

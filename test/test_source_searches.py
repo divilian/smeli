@@ -24,7 +24,7 @@ def test_get_work_candidates_from_openalex_uses_fetch_json_and_keeps_doi_less(mo
             ]
         }
 
-    monkeypatch.setattr(smeli.sources, "fetch_json", fake_fetch_json)
+    monkeypatch.setattr(smeli.sources, "_fetch_json", fake_fetch_json)
     results = smeli.get_work_candidates_from_openalex(author="starnini", title="opinion dynamics", year=2025)
     assert captured["source"] == "OpenAlex"
     assert captured["kwargs"]["params"]["search"] == "opinion dynamics"
@@ -56,7 +56,7 @@ def test_get_work_candidates_from_crossref_converts_and_filters(monkeypatch):
             }
         }
 
-    monkeypatch.setattr(smeli.sources, "fetch_json", fake_fetch_json)
+    monkeypatch.setattr(smeli.sources, "_fetch_json", fake_fetch_json)
     results = smeli.get_work_candidates_from_crossref(author="Baumann", title="echo chambers", year=2020)
     assert len(results) == 1
     assert results[0]["doi"] == "10.1103/PhysRevLett.124.048301"
@@ -80,7 +80,7 @@ def test_get_work_candidates_from_datacite_converts_and_filters(monkeypatch):
             ]
         }
 
-    monkeypatch.setattr(smeli.sources, "fetch_json", fake_fetch_json)
+    monkeypatch.setattr(smeli.sources, "_fetch_json", fake_fetch_json)
     results = smeli.get_work_candidates_from_datacite(author="starnini", title="opinion dynamics", year=2025)
     assert len(results) == 1
     assert results[0]["doi"] == "10.48550/arXiv.2507.11521"
@@ -103,7 +103,7 @@ def test_get_work_candidates_from_arxiv_parses_atom(monkeypatch):
     def fake_fetch_text(url, *, source="request", **kwargs):
         return atom
 
-    monkeypatch.setattr(smeli.sources, "fetch_text", fake_fetch_text)
+    monkeypatch.setattr(smeli.sources, "_fetch_text", fake_fetch_text)
     results = smeli.get_work_candidates_from_arxiv(author="starnini", title="opinion dynamics", year=2025)
     assert len(results) == 1
     assert results[0]["arxiv_id"] == "2507.11521"
@@ -137,7 +137,7 @@ def test_get_work_candidates_from_orcid_uses_openalex_orcid_filter(monkeypatch):
             ]
         }
 
-    monkeypatch.setattr(smeli.sources, "fetch_json", fake_fetch_json)
+    monkeypatch.setattr(smeli.sources, "_fetch_json", fake_fetch_json)
     results = smeli.get_work_candidates_from_orcid("0000-0002-0254-6627")
 
     assert captured["source"] == "OpenAlex"

@@ -1,14 +1,17 @@
 """HTTP helpers for smeli metadata sources."""
 from __future__ import annotations
 
+__all__: list[str] = []
+
+
 from typing import Any
 
 import requests
 
-from .config import CONTACT_EMAIL, DEFAULT_HEADERS, DEFAULT_TIMEOUT, OPENALEX_API_KEY
+from .config import _CONTACT_EMAIL, _DEFAULT_HEADERS, _DEFAULT_TIMEOUT, _OPENALEX_API_KEY
 
 
-def fetch_response(url: str, *, source: str = "request", **kwargs) -> requests.Response | None:
+def _fetch_response(url: str, *, source: str = "request", **kwargs) -> requests.Response | None:
     """Fetch a URL with shared headers, a timeout, and friendly errors.
 
     Pass quiet_statuses={...} for expected non-success statuses that should
@@ -16,8 +19,8 @@ def fetch_response(url: str, *, source: str = "request", **kwargs) -> requests.R
     """
     headers = kwargs.pop("headers", {})
     quiet_statuses = set(kwargs.pop("quiet_statuses", ()))
-    merged_headers = {**DEFAULT_HEADERS, **headers}
-    timeout = kwargs.pop("timeout", DEFAULT_TIMEOUT)
+    merged_headers = {**_DEFAULT_HEADERS, **headers}
+    timeout = kwargs.pop("timeout", _DEFAULT_TIMEOUT)
 
     try:
         response = requests.get(
@@ -43,9 +46,9 @@ def fetch_response(url: str, *, source: str = "request", **kwargs) -> requests.R
 
     return None
 
-def fetch_json(url: str, *, source: str = "request", **kwargs) -> dict[str, Any] | None:
+def _fetch_json(url: str, *, source: str = "request", **kwargs) -> dict[str, Any] | None:
     """Fetch a URL and return parsed JSON, or None on failure."""
-    response = fetch_response(url, source=source, **kwargs)
+    response = _fetch_response(url, source=source, **kwargs)
     if response is None:
         return None
 
@@ -55,27 +58,27 @@ def fetch_json(url: str, *, source: str = "request", **kwargs) -> dict[str, Any]
         print(f"{source} returned a response, but it was not valid JSON.")
         return None
 
-def fetch_text(url: str, *, source: str = "request", **kwargs) -> str | None:
+def _fetch_text(url: str, *, source: str = "request", **kwargs) -> str | None:
     """Fetch a URL and return text, or None on failure."""
-    response = fetch_response(url, source=source, **kwargs)
+    response = _fetch_response(url, source=source, **kwargs)
     if response is None:
         return None
     return response.text
 
-def crossref_params(extra: dict[str, Any] | None = None) -> dict[str, Any]:
+def _crossref_params(extra: dict[str, Any] | None = None) -> dict[str, Any]:
     """Return Crossref query params, including mailto when available."""
     params: dict[str, Any] = {}
-    if CONTACT_EMAIL:
-        params["mailto"] = CONTACT_EMAIL
+    if _CONTACT_EMAIL:
+        params["mailto"] = _CONTACT_EMAIL
     if extra:
         params.update(extra)
     return params
 
-def openalex_params(extra: dict[str, Any] | None = None) -> dict[str, Any]:
+def _openalex_params(extra: dict[str, Any] | None = None) -> dict[str, Any]:
     """Return OpenAlex query params, including an API key if configured."""
     params: dict[str, Any] = {}
-    if OPENALEX_API_KEY:
-        params["api_key"] = OPENALEX_API_KEY
+    if _OPENALEX_API_KEY:
+        params["api_key"] = _OPENALEX_API_KEY
     if extra:
         params.update(extra)
     return params
