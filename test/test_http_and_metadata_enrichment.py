@@ -109,3 +109,29 @@ def test_get_bibtex_from_doi_uses_doi_org_accept_header(monkeypatch):
     assert smeli.get_bibtex_from_doi("10.1234/abc def") == "@article{key}"
     assert captured["url"].endswith("10.1234/abc%20def")
     assert captured["headers"]["Accept"] == "application/x-bibtex"
+
+
+def test_fetch_response_can_silence_expected_statuses(monkeypatch, capsys):
+    response = FakeResponse()
+    response.status_code = 404
+    response.reason = "Not Found"
+    response.status_error = requests.HTTPError(response=response)
+
+    monkeypatch.setattr(smeli.http.requests, "get", lambda *args, **kwargs: response)
+
+    assert smeli.fetch_response("https://example.org/missing", source="DataCite", quiet_statuses={404}) is None
+    assert capsys.readouterr().out == ""
+
+
+def test_get_metadata_from_datacite_silences_404(monkeypatch, capsys):
+    captured = {}
+
+    def fake_fetch_json(url, *, source="request", **kwargs):
+        captured["kwargs"] = kwargs
+        return None
+
+    monkeypatch.setattr(smeli.sources, "fetch_json", fake_fetch_json)
+
+    assert smeli.get_metadata_from_datacite("10.1145/1897816.1897840") is None
+    assert captured["kwargs"]["quiet_statuses"] == {404}
+    assert capsys.readouterr().out == ""

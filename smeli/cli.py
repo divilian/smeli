@@ -9,7 +9,7 @@ from typing import Any
 
 from .bibtex import candidate_to_bibtex, print_bibtex
 from .candidates import canonical_candidate
-from .normalize import clean_doi, extract_arxiv_id, get_year_from_date
+from .normalize import clean_doi, extract_arxiv_id, extract_orcid, get_year_from_date
 from .config import MAX_DISPLAY_CANDIDATES
 from .sources import (
     get_best_structured_metadata,
@@ -18,6 +18,64 @@ from .sources import (
     get_orcids_from_openalex,
     get_work_candidates,
 )
+
+
+ANSI_RESET = "\033[0m"
+TITLE_COLOR = "\033[31m"         # red
+AUTHOR_COLOR = "\033[38;5;208m"  # orange
+YEAR_COLOR = "\033[34m"          # blue
+ID_COLOR = "\033[38;5;205m"      # pink
+
+
+def color_text(value: Any, color: str) -> str:
+    """Return value as ANSI-colored text for terminal display."""
+    text = str(value)
+    return f"{color}{text}{ANSI_RESET}"
+
+
+def color_title(value: Any) -> str:
+    return color_text(value, TITLE_COLOR)
+
+
+def color_author(value: Any) -> str:
+    return color_text(value, AUTHOR_COLOR)
+
+
+def color_year(value: Any) -> str:
+    return color_text(value, YEAR_COLOR)
+
+
+def color_identifier(value: Any) -> str:
+    return color_text(value, ID_COLOR)
+
+
+def identifier_type(identifier: str | None) -> str | None:
+    """Return a friendly identifier type label for search display."""
+    if not identifier:
+        return None
+    if extract_doi_from_text(identifier):
+        return "DOI"
+    if extract_orcid(identifier):
+        return "ORCID"
+    if extract_arxiv_id(identifier):
+        return "arXiv"
+    if extract_openalex_id_from_text(identifier):
+        return "OpenAlex"
+    return None
+
+
+def colored_pformat(key: str, value: Any) -> str:
+    """Pretty-format a value, adding Smeli's display colors for key fields."""
+    rendered = pformat(value)
+    if key == "title":
+        return color_title(rendered)
+    if key == "authors":
+        return color_author(rendered)
+    if key == "year":
+        return color_year(rendered)
+    if key in {"doi", "arxiv_id", "openalex_id"}:
+        return color_identifier(rendered)
+    return rendered
 
 
 def page_text(text: str) -> None:
@@ -31,13 +89,15 @@ def print_search_data(search_data: dict[str, str | None]) -> None:
         print("(none)")
     else:
         if search_data.get("title"):
-            print(f"title: {search_data['title']}")
+            print(f"title: {color_title(search_data['title'])}")
         if search_data.get("author"):
-            print(f"author: {search_data['author']}")
+            print(f"author: {color_author(search_data['author'])}")
         if search_data.get("year"):
-            print(f"year: {search_data['year']}")
+            print(f"year: {color_year(search_data['year'])}")
         if search_data.get("identifier"):
-            print(f"identifier: {search_data['identifier']}")
+            kind = identifier_type(search_data.get("identifier"))
+            label = f"identifier ({kind})" if kind else "identifier"
+            print(f"{label}: {color_identifier(search_data['identifier'])}")
         if search_data.get("query"):
             print(f"query: {search_data['query']}")
 
@@ -51,7 +111,7 @@ def format_authors(authors: list[str], max_authors: int = 4) -> str:
 
 def format_identifier_line(label: str, value: str | None) -> str:
     """Format one identifier line, showing an em dash for missing values."""
-    return f"   {label}: {value or '—'}\n"
+    return f"   {label}: {color_identifier(value) if value else '—'}\n"
 
 def serialize_candidate(
     candidate: dict[str, Any],
@@ -74,8 +134,8 @@ def serialize_candidate(
             score_text += f", cites: {candidate.get('citation_score')}"
         score_text += "]"
 
-    retval = f"{prefix}{title}{score_text}\n"
-    retval += f"   {authors} ({year})\n"
+    retval = f"{prefix}{color_title(title)}{score_text}\n"
+    retval += f"   {color_author(authors)} ({color_year(year)})\n"
     retval += f"   {venue}\n"
     if citations is not None:
         retval += f"   citations: {citations}\n"
@@ -102,7 +162,7 @@ def print_candidates(candidates: list[dict[str, Any]]) -> None:
 
 def print_dict(d: dict[str, Any]) -> None:
     for k, v in d.items():
-        print(f"  {k}: {pformat(v)}")
+        print(f"  {k}: {colored_pformat(k, v)}")
 
 def print_list_of_dicts(ld: list[dict[str, Any]]) -> None:
     for i in ld:
@@ -135,7 +195,7 @@ def print_selected_work_details(
     """Print structured metadata, identifiers, and BibTeX for a selected work."""
     title = candidate.get("title") or candidate.get("doi") or candidate.get("arxiv_id") or "Selected work"
     print("\n" + "=" * 60)
-    print(title)
+    print(color_title(title))
     print("=" * 60)
 
     print_selected_work_metadata(candidate)
@@ -253,6 +313,11 @@ def infer_search_data_from_text(text: str) -> dict[str, str | None]:
         search_data["identifier"] = arxiv_id
         return search_data
 
+    orcid = extract_orcid(text)
+    if orcid:
+        search_data["identifier"] = orcid
+        return search_data
+
     openalex_id = extract_openalex_id_from_text(text)
     if openalex_id:
         search_data["identifier"] = openalex_id
@@ -312,15 +377,20 @@ def show_lookup_results(
     direct_identifier: bool = False,
     force_list: bool = False,
     pause_at_end: bool = True,
-) -> None:
-    """Run a search and present either details or a selectable result list."""
+    show_search_data_on_no_results: bool = True,
+) -> bool:
+    """Run a search and present either details or a selectable result list.
+
+    Return True when at least one candidate was found, otherwise False.
+    """
     print("Looking up work candidates...")
     results = get_work_candidates(**search_data)
 
     if not results:
         print("No work candidates found matching those criteria.")
-        print_search_data(search_data)
-        return
+        if show_search_data_on_no_results:
+            print_search_data(search_data)
+        return False
 
     if not force_list and len(results) == 1:
         if direct_identifier:
@@ -328,10 +398,11 @@ def show_lookup_results(
         else:
             print("Found one candidate work.")
         print_selected_work_details(results[0], pause_at_end=pause_at_end)
-        return
+        return True
 
     print_result_counts(results)
     choose_from_results(results, pause_at_end=pause_at_end)
+    return True
 
 
 def run_one_shot(args: list[str]) -> None:
@@ -357,6 +428,7 @@ def run_one_shot(args: list[str]) -> None:
         direct_identifier=direct_identifier,
         force_list=force_list,
         pause_at_end=False,
+        show_search_data_on_no_results=False,
     )
 
 
@@ -415,7 +487,7 @@ def main(argv: list[str] | None = None) -> None:
             continue
 
         if choice == "i":
-            value = input("identifier (DOI, arXiv ID/URL, or OpenAlex work ID/URL): ").strip()
+            value = input("identifier (DOI, arXiv, ORCID, or OpenAlex): ").strip()
             search_data = {"title": None, "author": None, "year": None, "identifier": value or None}
             print_search_data(search_data)
             continue
@@ -426,8 +498,8 @@ def main(argv: list[str] | None = None) -> None:
                 continue
 
             direct_identifier = bool(search_data.get("identifier"))
-            show_lookup_results(search_data, direct_identifier=direct_identifier)
-            if not direct_identifier:
+            found = show_lookup_results(search_data, direct_identifier=direct_identifier)
+            if found and not direct_identifier:
                 print_search_data(search_data)
             continue
 

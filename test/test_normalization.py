@@ -29,3 +29,12 @@ def test_title_similarity_and_split_words_are_useful_for_matching():
     assert smeli.title_similarity("Opinion Dynamics", "opinion dynamics") == 1.0
     assert smeli.title_similarity("Opinion dynamics: Statistical physics", "Opinion dynamics statistical physics") > 0.85
     assert smeli.split_words("The opinion dynamics of a network") == {"opinion", "dynamics", "network"}
+
+
+def test_orcid_helpers_accept_bare_prefixed_and_url_forms():
+    assert smeli.extract_orcid("0000-0002-0254-6627") == "0000-0002-0254-6627"
+    assert smeli.extract_orcid("orcid:0000-0002-0254-662x") == "0000-0002-0254-662X"
+    assert smeli.extract_orcid("https://orcid.org/0000-0002-0254-6627") == "0000-0002-0254-6627"
+    assert smeli.looks_like_orcid("https://orcid.org/0000-0002-0254-6627")
+    assert smeli.orcid_url("0000-0002-0254-6627") == "https://orcid.org/0000-0002-0254-6627"
+    assert not smeli.looks_like_orcid("not an orcid")

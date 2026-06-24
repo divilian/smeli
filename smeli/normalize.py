@@ -45,6 +45,33 @@ def looks_like_doi(value: str | None) -> bool:
     doi = clean_doi(value)
     return bool(doi and re.match(r"^10\.\S+/\S+$", doi, re.IGNORECASE))
 
+ORCID_RE = re.compile(r"\b\d{4}-\d{4}-\d{4}-\d{3}[0-9X]\b", re.IGNORECASE)
+
+def extract_orcid(value: str | None) -> str | None:
+    """Extract and normalize a bare ORCID iD from text/URL, if present."""
+    if not value:
+        return None
+
+    text = value.strip()
+    match = ORCID_RE.search(text)
+    if not match:
+        return None
+
+    # ORCID check digits may be X; canonicalize that final character.
+    orcid = match.group(0)
+    return orcid[:-1] + orcid[-1].upper()
+
+def looks_like_orcid(value: str | None) -> bool:
+    """Return True if text contains an ORCID iD or ORCID URL."""
+    return extract_orcid(value) is not None
+
+def orcid_url(orcid: str | None) -> str | None:
+    """Return the canonical ORCID URL for an ORCID iD-like value."""
+    bare = extract_orcid(orcid)
+    if not bare:
+        return None
+    return f"https://orcid.org/{bare}"
+
 def quote_doi_for_path(doi: str) -> str:
     """
     Quote a DOI for APIs that place the DOI inside a URL path segment.

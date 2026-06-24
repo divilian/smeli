@@ -12,9 +12,12 @@ from .normalize import (
     base_arxiv_id,
     clean_doi,
     extract_arxiv_id,
+    extract_orcid,
     first,
     get_year_from_crossref,
     looks_like_doi,
+    looks_like_orcid,
+    orcid_url,
     quote_doi_for_doi_org,
     quote_doi_for_path,
     split_words,
@@ -85,7 +88,7 @@ def get_metadata_from_datacite(doi: str) -> dict[str, Any] | None:
         return None
 
     url = f"https://api.datacite.org/dois/{quote_doi_for_path(doi)}"
-    data = fetch_json(url, source="DataCite")
+    data = fetch_json(url, source="DataCite", quiet_statuses={404})
     if not data:
         return None
 
@@ -628,8 +631,40 @@ def get_work_candidates_from_arxiv_loose(
 
     return matched
 
+def get_work_candidates_from_orcid(orcid: str) -> list[dict[str, Any]]:
+    """Fetch work candidates for an author ORCID using OpenAlex."""
+    bare_orcid = extract_orcid(orcid)
+    if not bare_orcid:
+        return []
+
+    url = "https://api.openalex.org/works"
+    params: dict[str, Any] = {
+        "per-page": MAX_CANDIDATES_PER_SOURCE,
+        # OpenAlex works support filtering on the ORCID field nested inside
+        # authorships.author. Use the bare ORCID here; using the canonical
+        # https://orcid.org/... URL in an author-id filter can produce a 400.
+        "filter": f"authorships.author.orcid:{bare_orcid}",
+        "sort": "publication_date:desc",
+    }
+
+    data = fetch_json(url, source="OpenAlex", params=openalex_params(params))
+    if not data:
+        return []
+
+    matched = []
+    for item in data.get("results", []):
+        candidate = openalex_item_to_candidate(item)
+        if not candidate:
+            continue
+        note = f"ORCID {bare_orcid}"
+        candidate["_match_note"] = note
+        candidate["match_note"] = note
+        matched.append(candidate)
+
+    return matched
+
 def get_work_candidates_from_identifier(identifier: str) -> list[dict[str, Any]]:
-    """Resolve a DOI, arXiv ID/URL, or OpenAlex work ID/URL to candidates."""
+    """Resolve a DOI, arXiv ID/URL, ORCID, or OpenAlex work ID/URL."""
     identifier = identifier.strip()
     if not identifier:
         return []
@@ -643,11 +678,14 @@ def get_work_candidates_from_identifier(identifier: str) -> list[dict[str, Any]]
         candidate = get_candidate_from_arxiv_id(arxiv_id)
         return [candidate] if candidate else []
 
+    if looks_like_orcid(identifier):
+        return get_work_candidates_from_orcid(identifier)
+
     if "openalex.org/" in identifier.lower() or re.fullmatch(r"W\d+", identifier.strip(), re.IGNORECASE):
         candidate = get_candidate_from_openalex_id(identifier)
         return [candidate] if candidate else []
 
-    print("Identifier did not look like a DOI, arXiv ID/URL, or OpenAlex work ID/URL.")
+    print("Identifier did not look like a DOI, arXiv ID/URL, ORCID or OpenAlex work ID/URL.")
     return []
 
 def get_work_candidates(

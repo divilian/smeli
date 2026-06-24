@@ -107,3 +107,41 @@ def test_get_work_candidates_from_arxiv_parses_atom(monkeypatch):
     results = smeli.get_work_candidates_from_arxiv(author="starnini", title="opinion dynamics", year=2025)
     assert len(results) == 1
     assert results[0]["arxiv_id"] == "2507.11521"
+
+
+def test_get_work_candidates_from_orcid_uses_openalex_orcid_filter(monkeypatch):
+    captured = {}
+
+    def fake_fetch_json(url, *, source="request", **kwargs):
+        captured["url"] = url
+        captured["source"] = source
+        captured["kwargs"] = kwargs
+        return {
+            "results": [
+                {
+                    "id": "https://openalex.org/W999",
+                    "doi": "https://doi.org/10.1145/1897816.1897840",
+                    "ids": {"doi": "https://doi.org/10.1145/1897816.1897840"},
+                    "title": "Still building the memex",
+                    "publication_year": 2011,
+                    "authorships": [
+                        {"author": {"display_name": "Stephen Davies", "orcid": "https://orcid.org/0000-0002-0254-6627"}}
+                    ],
+                    "primary_location": {
+                        "landing_page_url": "https://doi.org/10.1145/1897816.1897840",
+                        "source": {"display_name": "Communications of the ACM"},
+                    },
+                    "cited_by_count": 7,
+                    "type": "article",
+                }
+            ]
+        }
+
+    monkeypatch.setattr(smeli.sources, "fetch_json", fake_fetch_json)
+    results = smeli.get_work_candidates_from_orcid("0000-0002-0254-6627")
+
+    assert captured["source"] == "OpenAlex"
+    assert captured["kwargs"]["params"]["filter"] == "authorships.author.orcid:0000-0002-0254-6627"
+    assert captured["kwargs"]["params"]["sort"] == "publication_date:desc"
+    assert results[0]["title"] == "Still building the memex"
+    assert results[0]["match_note"] == "ORCID 0000-0002-0254-6627"

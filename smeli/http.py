@@ -9,8 +9,13 @@ from .config import CONTACT_EMAIL, DEFAULT_HEADERS, DEFAULT_TIMEOUT, OPENALEX_AP
 
 
 def fetch_response(url: str, *, source: str = "request", **kwargs) -> requests.Response | None:
-    """Fetch a URL with shared headers, a timeout, and friendly errors."""
+    """Fetch a URL with shared headers, a timeout, and friendly errors.
+
+    Pass quiet_statuses={...} for expected non-success statuses that should
+    simply behave like a missing record rather than producing terminal noise.
+    """
     headers = kwargs.pop("headers", {})
+    quiet_statuses = set(kwargs.pop("quiet_statuses", ()))
     merged_headers = {**DEFAULT_HEADERS, **headers}
     timeout = kwargs.pop("timeout", DEFAULT_TIMEOUT)
 
@@ -26,6 +31,8 @@ def fetch_response(url: str, *, source: str = "request", **kwargs) -> requests.R
     except requests.HTTPError as e:
         response = e.response
         if response is not None:
+            if response.status_code in quiet_statuses:
+                return None
             print(f"{source} request failed: {response.status_code} {response.reason}")
         else:
             print(f"{source} request failed: {e}")

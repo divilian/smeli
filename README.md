@@ -12,14 +12,15 @@ After installing the project, the console command is:
 smeli
 ```
 
-You can also pass a DOI, arXiv/OpenAlex identifier, or free-form bibliographic text directly on the command line:
+You can also pass a DOI, ORCID, arXiv/OpenAlex identifier, or free-form bibliographic text directly on the command line:
 
 ```bash
 smeli 10.1126/science.1102081
+smeli 0000-0002-1825-0097
 smeli still building the memex davies
 ```
 
-Identifier lookups go straight to the matching work details when exactly one work is found. Free-form text searches show a ranked candidate list.
+Identifier and free-form lookups go straight to work details when exactly one work is found. ORCID lookups usually return an author's ranked work list.
 
 ## Tests
 

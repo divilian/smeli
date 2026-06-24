@@ -93,13 +93,15 @@ def test_get_work_candidates_tries_loose_fallback_when_fielded_empty(monkeypatch
     assert results[0]["match_note"] == "broad all-fields fallback"
 
 
-def test_get_work_candidates_from_identifier_dispatches_doi_arxiv_openalex(monkeypatch):
+def test_get_work_candidates_from_identifier_dispatches_doi_arxiv_orcid_openalex(monkeypatch):
     monkeypatch.setattr(smeli.sources, "get_candidate_from_doi", lambda value: {"doi": smeli.clean_doi(value), "title": "DOI work"})
     monkeypatch.setattr(smeli.sources, "get_candidate_from_arxiv_id", lambda value: {"arxiv_id": smeli.base_arxiv_id(value), "title": "arXiv work"})
+    monkeypatch.setattr(smeli.sources, "get_work_candidates_from_orcid", lambda value: [{"orcid": smeli.extract_orcid(value), "title": "ORCID work"}])
     monkeypatch.setattr(smeli.sources, "get_candidate_from_openalex_id", lambda value: {"openalex_id": value, "title": "OpenAlex work"})
 
     assert smeli.get_work_candidates_from_identifier("https://doi.org/10.1234/foo")[0]["doi"] == "10.1234/foo"
     assert smeli.get_work_candidates_from_identifier("https://arxiv.org/abs/2507.11521v1")[0]["arxiv_id"] == "2507.11521"
+    assert smeli.get_work_candidates_from_identifier("https://orcid.org/0000-0002-0254-6627")[0]["orcid"] == "0000-0002-0254-6627"
     assert smeli.get_work_candidates_from_identifier("W123")[0]["openalex_id"] == "W123"
 
 
