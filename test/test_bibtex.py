@@ -31,15 +31,22 @@ def test_parse_bibtex_entry_returns_none_for_non_entry():
     assert smeli.parse_bibtex_entry("not bibtex") is None
 
 
-def test_make_cite_key_is_readable_and_stable_enough():
+def test_make_cite_key_uses_first_author_surname_and_year():
     candidate = {
         "authors": ["Michele Starnini"],
         "year": 2025,
         "title": "Opinion dynamics: Statistical physics and beyond",
     }
-    cite_key = smeli.make_cite_key(candidate)
-    assert cite_key.startswith("starnini2025")
-    assert "opinion" in cite_key
+    assert smeli.make_cite_key(candidate) == "starnini2025"
+
+
+def test_make_cite_key_handles_comma_form_author_names():
+    candidate = {
+        "authors": ["Davies, Stephen"],
+        "year": 2011,
+        "title": "Still building the memex",
+    }
+    assert smeli.make_cite_key(candidate) == "davies2011"
 
 
 def test_candidate_to_bibtex_includes_arxiv_fields_for_doi_less_arxiv_candidate():

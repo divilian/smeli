@@ -655,14 +655,27 @@ def get_work_candidates(
     title: str | None = None,
     year: str | int | None = None,
     identifier: str | None = None,
+    query: str | None = None,
 ) -> list[dict[str, Any]]:
     """Search all configured metadata sources and return merged work candidates."""
     search_variants: list[dict[str, Any]] = [
-        {"author": author, "title": title, "year": year},
+        {"author": author, "title": title or query, "year": year},
     ]
 
     if identifier:
         candidates = get_work_candidates_from_identifier(identifier)
+    elif query:
+        candidates = []
+        print("  OpenAlex...")
+        candidates.extend(get_work_candidates_from_openalex_loose(query, year=year))
+        print("  Crossref...")
+        candidates.extend(get_work_candidates_from_crossref_loose(query, year=year))
+        print("  DataCite...")
+        candidates.extend(get_work_candidates_from_datacite_loose(query, year=year))
+        print("  arXiv...")
+        candidates.extend(get_work_candidates_from_arxiv_loose(query, year=year))
+        for candidate in candidates:
+            candidate["_match_note"] = "free-form query"
     else:
         candidates = []
         print("  OpenAlex...")

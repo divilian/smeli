@@ -101,3 +101,27 @@ def test_get_work_candidates_from_identifier_dispatches_doi_arxiv_openalex(monke
     assert smeli.get_work_candidates_from_identifier("https://doi.org/10.1234/foo")[0]["doi"] == "10.1234/foo"
     assert smeli.get_work_candidates_from_identifier("https://arxiv.org/abs/2507.11521v1")[0]["arxiv_id"] == "2507.11521"
     assert smeli.get_work_candidates_from_identifier("W123")[0]["openalex_id"] == "W123"
+
+
+def test_get_work_candidates_uses_loose_sources_for_free_form_query(monkeypatch):
+    calls = []
+
+    def fake_openalex_loose(query, **kwargs):
+        calls.append(("openalex", query, kwargs))
+        return [starnini_candidate()] if query == "starnini opinion dynamics" else []
+
+    monkeypatch.setattr(smeli.sources, "get_work_candidates_from_openalex", lambda **kwargs: (_ for _ in ()).throw(AssertionError("strict OpenAlex should not be used for query")))
+    monkeypatch.setattr(smeli.sources, "get_work_candidates_from_crossref", lambda **kwargs: (_ for _ in ()).throw(AssertionError("strict Crossref should not be used for query")))
+    monkeypatch.setattr(smeli.sources, "get_work_candidates_from_datacite", lambda **kwargs: (_ for _ in ()).throw(AssertionError("strict DataCite should not be used for query")))
+    monkeypatch.setattr(smeli.sources, "get_work_candidates_from_arxiv", lambda **kwargs: (_ for _ in ()).throw(AssertionError("strict arXiv should not be used for query")))
+    monkeypatch.setattr(smeli.sources, "get_work_candidates_from_openalex_loose", fake_openalex_loose)
+    monkeypatch.setattr(smeli.sources, "get_work_candidates_from_crossref_loose", lambda query, **kwargs: calls.append(("crossref", query, kwargs)) or [])
+    monkeypatch.setattr(smeli.sources, "get_work_candidates_from_datacite_loose", lambda query, **kwargs: calls.append(("datacite", query, kwargs)) or [])
+    monkeypatch.setattr(smeli.sources, "get_work_candidates_from_arxiv_loose", lambda query, **kwargs: calls.append(("arxiv", query, kwargs)) or [])
+
+    results = smeli.get_work_candidates(query="starnini opinion dynamics", year=2025)
+
+    assert len(results) == 1
+    assert results[0]["match_note"] == "free-form query"
+    assert {name for name, _, _ in calls} == {"openalex", "crossref", "datacite", "arxiv"}
+    assert all(query == "starnini opinion dynamics" for _, query, _ in calls)

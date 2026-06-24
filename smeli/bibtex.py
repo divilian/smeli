@@ -159,24 +159,16 @@ def bibtex_escape(value: Any) -> str:
     return text
 
 def make_cite_key(candidate: dict[str, Any]) -> str:
-    """Create a readable citation key from first author, year, and title."""
+    """Create a compact citation key from first-author surname and year."""
     authors = candidate.get("authors") or []
     if authors:
         author_part = author_lastish_name(authors[0]) or "work"
     else:
         author_part = "work"
-    year = candidate.get("year") or "nd"
 
-    # Keep title words in their original order. split_words() returns a set,
-    # which is fine for matching but produces unstable and less readable keys.
-    stop = {"a", "an", "and", "by", "for", "in", "of", "on", "the", "to", "with"}
-    title_words = [
-        word
-        for word in normalize_for_match(candidate.get("title")).split()
-        if len(word) > 2 and word not in stop
-    ][:3]
-    title_part = "".join(word[:12] for word in title_words) or "metadata"
-    return re.sub(r"[^A-Za-z0-9_:-]", "", f"{author_part}{year}{title_part}")
+    year = candidate.get("year") or "nd"
+    key = f"{author_part}{year}".lower()
+    return re.sub(r"[^a-z0-9_:-]", "", key)
 
 def candidate_to_bibtex(candidate: dict[str, Any]) -> str:
     """Generate a conservative BibTeX-like entry from available candidate metadata."""

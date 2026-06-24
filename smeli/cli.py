@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import pydoc
+import re
 import sys
 from pprint import pformat
 from typing import Any
 
 from .bibtex import candidate_to_bibtex, print_bibtex
 from .candidates import canonical_candidate
+from .normalize import clean_doi, extract_arxiv_id, get_year_from_date
 from .config import MAX_DISPLAY_CANDIDATES
 from .sources import (
     get_best_structured_metadata,
@@ -36,6 +38,8 @@ def print_search_data(search_data: dict[str, str | None]) -> None:
             print(f"year: {search_data['year']}")
         if search_data.get("identifier"):
             print(f"identifier: {search_data['identifier']}")
+        if search_data.get("query"):
+            print(f"query: {search_data['query']}")
 
 def format_authors(authors: list[str], max_authors: int = 4) -> str:
     """Return a compact author display string."""
@@ -123,7 +127,11 @@ def print_selected_work_metadata(candidate: dict[str, Any]) -> None:
         "url": candidate.get("url", ""),
     })
 
-def print_selected_work_details(candidate: dict[str, Any]) -> None:
+def print_selected_work_details(
+    candidate: dict[str, Any],
+    *,
+    pause_at_end: bool = True,
+) -> None:
     """Print structured metadata, identifiers, and BibTeX for a selected work."""
     title = candidate.get("title") or candidate.get("doi") or candidate.get("arxiv_id") or "Selected work"
     print("\n" + "=" * 60)
@@ -134,6 +142,8 @@ def print_selected_work_details(candidate: dict[str, Any]) -> None:
     input("(Press Enter.)")
 
     doi = candidate.get("doi")
+    used_doi_org_bibtex = False
+
     if doi:
         print("\n--- Structured DOI metadata ---")
         metadata = get_best_structured_metadata(doi)
@@ -159,18 +169,23 @@ def print_selected_work_details(candidate: dict[str, Any]) -> None:
         bibtex = get_bibtex_from_doi(doi)
         if bibtex is None:
             print("No BibTeX returned by doi.org content negotiation.")
+            input("(Press Enter.)")
         else:
             print_bibtex(bibtex)
-        input("(Press Enter.)")
+            used_doi_org_bibtex = True
+            if pause_at_end:
+                input("(Press Enter to continue.)")
     else:
         print("\n--- DOI-specific enrichment skipped ---")
         print("This selected work does not currently have a DOI in the merged metadata.")
         input("(Press Enter.)")
 
-    print("\n--- Generated BibTeX-like entry from available metadata ---")
-    generated = candidate_to_bibtex(candidate)
-    print_bibtex(generated)
-    input("(Press Enter to return to results list.)")
+    if not used_doi_org_bibtex:
+        print("\n--- Generated BibTeX-like entry from available metadata ---")
+        generated = candidate_to_bibtex(candidate)
+        print_bibtex(generated)
+        if pause_at_end:
+            input("(Press Enter to continue.)")
 
     print("=" * 60)
 
@@ -179,8 +194,181 @@ def print_selected_doi_details(doi: str) -> None:
     candidate = get_candidate_from_doi(doi) or canonical_candidate({"doi": doi, "source": "user-supplied DOI"})
     print_selected_work_details(candidate)
 
-def main() -> None:
+def extract_doi_from_text(text: str) -> str | None:
+    """Extract a DOI from arbitrary command-line text, if one is present."""
+    match = re.search(
+        r"(?:https?://(?:dx\.)?doi\.org/|doi:\s*)?(10\.\d{4,9}/\S+)",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        return None
+    return clean_doi(match.group(1))
+
+
+def extract_openalex_id_from_text(text: str) -> str | None:
+    """Extract an OpenAlex work ID or URL from arbitrary text, if present."""
+    match = re.search(r"https?://openalex\.org/(?:works/)?(W\d+)", text, flags=re.IGNORECASE)
+    if match:
+        return match.group(1)
+
+    stripped = text.strip()
+    if re.fullmatch(r"W\d+", stripped, flags=re.IGNORECASE):
+        return stripped
+
+    return None
+
+
+def remove_first_year(text: str, year: str | None) -> str:
+    """Remove one standalone year token from free-form query text."""
+    if not year:
+        return text.strip()
+    return re.sub(r"\s+", " ", re.sub(rf"\b{re.escape(year)}\b", " ", text, count=1)).strip()
+
+
+def infer_search_data_from_text(text: str) -> dict[str, str | None]:
+    """
+    Infer a smeli search from arbitrary command-line text.
+
+    Identifiers win because DOI, arXiv, and OpenAlex IDs are intended to name a
+    specific work. Otherwise the text is treated as a broad bibliographic query,
+    with a standalone four-digit year extracted when present.
+    """
+    text = text.strip()
+    search_data: dict[str, str | None] = {
+        "title": None,
+        "author": None,
+        "year": None,
+        "identifier": None,
+        "query": None,
+    }
+
+    doi = extract_doi_from_text(text)
+    if doi:
+        search_data["identifier"] = doi
+        return search_data
+
+    arxiv_id = extract_arxiv_id(text)
+    if arxiv_id:
+        search_data["identifier"] = arxiv_id
+        return search_data
+
+    openalex_id = extract_openalex_id_from_text(text)
+    if openalex_id:
+        search_data["identifier"] = openalex_id
+        return search_data
+
+    year = get_year_from_date(text)
+    query = remove_first_year(text, str(year) if year else None)
+    search_data["year"] = str(year) if year else None
+    search_data["query"] = query or text
+    return search_data
+
+
+def print_result_counts(results: list[dict[str, Any]]) -> None:
+    """Print a compact count summary for candidate results."""
+    doi_count = sum(1 for result in results if result.get("doi"))
+    arxiv_count = sum(1 for result in results if result.get("arxiv_id"))
+    print(
+        f"Found {len(results)} candidate work(s): "
+        f"{doi_count} with DOI, {arxiv_count} with arXiv ID."
+    )
+
+
+def choose_from_results(
+    results: list[dict[str, Any]],
+    *,
+    pause_at_end: bool = True,
+) -> None:
+    """Let the user select a candidate from an already-fetched result list."""
+    while True:
+        print()
+        print_candidates(results)
+
+        work_choice = input(
+            "Choose work number (or [q]uit): "
+        ).strip().lower()
+
+        if work_choice == "q":
+            return
+
+        try:
+            idx = int(work_choice) - 1
+        except ValueError:
+            print("Please enter a valid number or 'q'.")
+            continue
+
+        if not (0 <= idx < min(len(results), MAX_DISPLAY_CANDIDATES)):
+            print("Invalid number. Please choose from the displayed list.")
+            continue
+
+        selected = results[idx]
+        print_selected_work_details(selected, pause_at_end=pause_at_end)
+
+
+def show_lookup_results(
+    search_data: dict[str, str | None],
+    *,
+    direct_identifier: bool = False,
+    force_list: bool = False,
+    pause_at_end: bool = True,
+) -> None:
+    """Run a search and present either details or a selectable result list."""
+    print("Looking up work candidates...")
+    results = get_work_candidates(**search_data)
+
+    if not results:
+        print("No work candidates found matching those criteria.")
+        print_search_data(search_data)
+        return
+
+    if not force_list and len(results) == 1:
+        if direct_identifier:
+            print("Found one work for that identifier.")
+        else:
+            print("Found one candidate work.")
+        print_selected_work_details(results[0], pause_at_end=pause_at_end)
+        return
+
+    print_result_counts(results)
+    choose_from_results(results, pause_at_end=pause_at_end)
+
+
+def run_one_shot(args: list[str]) -> None:
+    """Run a non-menu lookup from command-line arguments."""
+    force_list = False
+    query_parts: list[str] = []
+
+    for arg in args:
+        if arg == "--list":
+            force_list = True
+        else:
+            query_parts.append(arg)
+
+    query_text = " ".join(query_parts).strip()
+    if not query_text:
+        main([])
+        return
+
+    search_data = infer_search_data_from_text(query_text)
+    direct_identifier = bool(search_data.get("identifier"))
+    show_lookup_results(
+        search_data,
+        direct_identifier=direct_identifier,
+        force_list=force_list,
+        pause_at_end=False,
+    )
+
+
+def main(argv: list[str] | None = None) -> None:
     """Run the scholarly metadata lookup CLI."""
+    if argv is None:
+        argv = sys.argv[1:]
+
+    if argv:
+        run_one_shot(argv)
+        return
+
     print("Welcome to the scholarly metadata lookup program!")
 
     search_data: dict[str, str | None] = {
@@ -237,47 +425,10 @@ def main() -> None:
                 print("Please enter a title, author, year, or identifier first.")
                 continue
 
-            print("Looking up work candidates...")
-            results = get_work_candidates(**search_data)
-
-            if not results:
-                print("No work candidates found matching those criteria.")
+            direct_identifier = bool(search_data.get("identifier"))
+            show_lookup_results(search_data, direct_identifier=direct_identifier)
+            if not direct_identifier:
                 print_search_data(search_data)
-                continue
-
-            doi_count = sum(1 for result in results if result.get("doi"))
-            arxiv_count = sum(1 for result in results if result.get("arxiv_id"))
-            print(
-                f"Found {len(results)} candidate work(s): "
-                f"{doi_count} with DOI, {arxiv_count} with arXiv ID."
-            )
-
-            # Inner work-selection loop
-            while True:
-                print()
-                print_candidates(results)
-
-                work_choice = input(
-                    "Choose work number (or [q]uit): "
-                ).strip().lower()
-
-                if work_choice == "q":
-                    print_search_data(search_data)
-                    break
-
-                try:
-                    idx = int(work_choice) - 1
-                except ValueError:
-                    print("Please enter a valid number or 'q'.")
-                    continue
-
-                if not (0 <= idx < min(len(results), MAX_DISPLAY_CANDIDATES)):
-                    print("Invalid number. Please choose from the displayed list.")
-                    continue
-
-                selected = results[idx]
-                print_selected_work_details(selected)
-
             continue
 
         print("Invalid option. Please try again.")
