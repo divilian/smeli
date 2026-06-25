@@ -86,8 +86,9 @@ def parse_bibtex_entry(bibtex: str) -> dict[str, Any] | None:
         bibtex: Text containing one BibTeX entry.
 
     Returns:
-        A dictionary with ``entry_type``, ``cite_key``, and ``fields`` keys, or
-        ``None`` if the text does not look like a normal single BibTeX entry.
+        dict[str, Any] | None: A dictionary with ``entry_type``, ``cite_key``,
+            and ``fields`` keys, or ``None`` if the text does not look like a
+            normal single BibTeX entry.
 
     Notes:
         This parser is intentionally small. It handles ordinary BibTeX returned
@@ -126,7 +127,7 @@ def print_bibtex(bibtex: str) -> None:
         bibtex: Text containing one BibTeX entry.
 
     Returns:
-        ``None``. Output is written to standard output.
+        None: Output is written to standard output.
 
     Notes:
         The raw BibTeX is printed after the field-by-field display so it can
@@ -192,9 +193,9 @@ Args:
     candidate: A Smeli candidate dictionary.
 
 Returns:
-    A lower-case key in Kurrent/Smeli style, such as ``"davies2011"`` or
-    ``"starnini2025"``. Missing authors fall back to ``"paper"`` and missing
-    years fall back to ``"nd"``.
+    str: A lower-case key in Kurrent/Smeli style, such as ``"davies2011"`` or
+        ``"starnini2025"``. Missing authors fall back to ``"paper"`` and
+        missing years fall back to ``"nd"``.
 """
     authors = candidate.get("authors") or []
     if authors:
@@ -213,12 +214,12 @@ Args:
     candidate: A Smeli candidate dictionary.
 
 Returns:
-    A BibTeX-like string using available fields such as title, authors, year,
-    venue, DOI, arXiv ID, and URL.
+    str: A BibTeX-like string using available fields such as title, authors,
+        year, venue, DOI, arXiv ID, and URL.
 
 Notes:
     This is a fallback formatter, not a replacement for publisher- or
-    resolver-provided BibTeX. Prefer :func:`smeli.sources.get_bibtex_from_doi`
+    resolver-provided BibTeX. Prefer `smeli.sources.get_bibtex_from_doi()`
     when a DOI is available and doi.org content negotiation succeeds.
 """
     entry_type = "article"

@@ -2,7 +2,7 @@
 
 A **candidate** is Smeli's normal dictionary representation for a scholarly paper or paper-like output. A candidate may describe a journal article, conference paper, arXiv preprint, dataset, software record, repository item, or another scholarly output.
 
-Smeli deliberately uses dictionaries rather than a custom class for now because source APIs vary and the command-line tool benefits from flexible partial records.
+Smeli deliberately uses dictionaries rather than a custom class because source APIs vary and the command-line tool benefits from flexible partial records.
 
 ## Common keys
 

@@ -19,11 +19,11 @@ from smeli.normalize import extract_orcid
 
 | Module | Purpose |
 | --- | --- |
-| `smeli.normalize` | Pure identifier normalization helpers for DOI, ORCID, and arXiv IDs. |
-| `smeli.candidates` | Pure local helpers for canonicalizing, scoring, comparing, and merging candidate records. |
-| `smeli.sources` | Networked metadata lookups against Crossref, DataCite, OpenAlex, arXiv, and doi.org. |
-| `smeli.bibtex` | Small BibTeX parser/printer plus Smeli fallback BibTeX generation. |
-| `smeli.cli` | The `main()` console-script entrypoint for the `smeli` command. |
+| [`smeli.normalize`](reference/normalize.md) | Pure identifier normalization helpers for DOI, ORCID, and arXiv IDs. |
+| [`smeli.candidates`](reference/candidates.md) | Pure local helpers for canonicalizing, scoring, comparing, and merging candidate records. |
+| [`smeli.sources`](reference/sources.md) | Networked metadata lookups against Crossref, DataCite, OpenAlex, arXiv, and doi.org. |
+| [`smeli.bibtex`](reference/bibtex.md) | Small BibTeX parser/printer plus Smeli fallback BibTeX generation. |
+| [`smeli.cli`](reference/cli.md) | The `main()` console-script entrypoint for the `smeli` command. |
 
 ## Recommended entrypoints
 

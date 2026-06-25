@@ -79,9 +79,10 @@ def get_metadata_from_crossref(doi: str) -> dict[str, Any] | None:
         doi: A bare DOI, DOI URL, or DOI-like string.
 
     Returns:
-        A metadata dictionary with keys such as ``source``, ``doi``, ``title``,
-        ``authors``, ``journal``, ``publisher``, ``citations``, ``year``,
-        ``type``, and ``url``; or ``None`` if Crossref has no usable record.
+        dict[str, Any] | None: A metadata dictionary with keys such as
+            ``source``, ``doi``, ``title``, ``authors``, ``journal``,
+            ``publisher``, ``citations``, ``year``, ``type``, and ``url``; or
+            ``None`` if Crossref has no usable record.
 
     Notes:
         This is a Crossref-specific lookup. It can fail for valid DOIs
@@ -121,9 +122,10 @@ def get_metadata_from_datacite(doi: str) -> dict[str, Any] | None:
         doi: A bare DOI, DOI URL, or DOI-like string.
 
     Returns:
-        A metadata dictionary with keys such as ``source``, ``doi``, ``title``,
-        ``authors``, ``journal``, ``publisher``, ``citations``, ``year``,
-        ``type``, and ``url``; or ``None`` if DataCite has no usable record.
+        dict[str, Any] | None: A metadata dictionary with keys such as
+            ``source``, ``doi``, ``title``, ``authors``, ``journal``,
+            ``publisher``, ``citations``, ``year``, ``type``, and ``url``; or
+            ``None`` if DataCite has no usable record.
 
     Notes:
         DataCite is a separate DOI registration agency from Crossref. It is
@@ -168,8 +170,9 @@ def get_best_structured_metadata(doi: str) -> dict[str, Any] | None:
         doi: A bare DOI, DOI URL, or DOI-like string.
 
     Returns:
-        A Crossref metadata dictionary when Crossref has a usable record;
-        otherwise a DataCite metadata dictionary; otherwise ``None``.
+        dict[str, Any] | None: A Crossref metadata dictionary when Crossref has
+            a usable record; otherwise a DataCite metadata dictionary; otherwise
+            ``None``.
 
     Notes:
         Crossref is tried first because it is usually best for article and
@@ -189,8 +192,8 @@ def get_bibtex_from_doi(doi: str) -> str | None:
         doi: A bare DOI, DOI URL, or DOI-like string.
 
     Returns:
-        A raw BibTeX string from the DOI resolver, or ``None`` when no BibTeX is
-        returned.
+        str | None: A raw BibTeX string from the DOI resolver, or ``None`` when
+            no BibTeX is returned.
 
     Notes:
         This goes through the DOI resolver rather than Crossref directly, so it
@@ -211,8 +214,8 @@ Args:
     doi: A bare DOI, DOI URL, or DOI-like string.
 
 Returns:
-    A list of dictionaries with ``name`` and ``orcid`` keys. Returns an empty
-    list when OpenAlex has no ORCID data for the paper.
+    list[dict[str, str]]: A list of dictionaries with ``name`` and ``orcid``
+        keys, or an empty list when OpenAlex has no ORCID data for the paper.
 """
     doi = clean_doi(doi)
     if not doi:
@@ -245,8 +248,9 @@ def get_orcids_from_crossref(doi: str) -> list[dict[str, str]]:
         doi: A bare DOI, DOI URL, or DOI-like string.
 
     Returns:
-        A list of dictionaries with ``name`` and ``orcid`` keys. Returns an
-        empty list when Crossref has no ORCID data for the paper.
+        list[dict[str, str]]: A list of dictionaries with ``name`` and
+            ``orcid`` keys, or an empty list when Crossref has no ORCID data for
+            the paper.
 
     Notes:
         Crossref ORCID coverage depends on what the publisher supplied.
@@ -284,8 +288,8 @@ Args:
     year: Optional publication year.
 
 Returns:
-    A list of Smeli candidate dictionaries from Crossref that pass local
-    matching.
+    list[dict[str, Any]]: A list of Smeli candidate dictionaries from Crossref
+        that pass local matching.
 """
     url = "https://api.crossref.org/works"
 
@@ -330,8 +334,8 @@ def get_paper_candidates_from_openalex(
         year: Optional publication year.
 
     Returns:
-        A list of Smeli candidate dictionaries from OpenAlex that pass local
-        matching.
+        list[dict[str, Any]]: A list of Smeli candidate dictionaries from
+            OpenAlex that pass local matching.
 
     Notes:
         DOI-less OpenAlex records are deliberately retained.
@@ -389,8 +393,8 @@ Args:
     year: Optional publication year.
 
 Returns:
-    A list of Smeli candidate dictionaries from DataCite that pass local
-    matching.
+    list[dict[str, Any]]: A list of Smeli candidate dictionaries from DataCite
+        that pass local matching.
 """
     url = "https://api.datacite.org/dois"
     query = bibliographic_query(author, title, year)
@@ -448,7 +452,8 @@ Args:
     year: Optional publication year used for local filtering.
 
 Returns:
-    A list of Smeli candidate dictionaries from arXiv that pass local matching.
+    list[dict[str, Any]]: A list of Smeli candidate dictionaries from arXiv that
+        pass local matching.
 """
     if not title and not author:
         return []
@@ -492,8 +497,8 @@ Args:
         ``openalex.org`` Work URL.
 
 Returns:
-    A Smeli candidate dictionary, or ``None`` when the OpenAlex record cannot be
-    fetched or converted.
+    dict[str, Any] | None: A Smeli candidate dictionary, or ``None`` when the
+        OpenAlex record cannot be fetched or converted.
 """
     value = openalex_id.strip()
     if not value:
@@ -518,7 +523,8 @@ Args:
     arxiv_id: A bare arXiv ID, ``arXiv:``-prefixed ID, or arXiv URL.
 
 Returns:
-    A Smeli candidate dictionary, or ``None`` when arXiv has no matching entry.
+    dict[str, Any] | None: A Smeli candidate dictionary, or ``None`` when arXiv
+        has no matching entry.
 """
     arxiv_id = base_arxiv_id(extract_arxiv_id(arxiv_id) or arxiv_id)
     if not arxiv_id:
@@ -550,9 +556,9 @@ Args:
     doi: A bare DOI, DOI URL, or DOI-like string.
 
 Returns:
-    A merged Smeli candidate dictionary enriched from Crossref, DataCite, and
-    OpenAlex where available. If no external metadata is found for a valid DOI,
-    returns a minimal DOI-only candidate.
+    dict[str, Any] | None: A merged Smeli candidate dictionary enriched from
+        Crossref, DataCite, and OpenAlex where available. If no external
+        metadata is found for a valid DOI, returns a minimal DOI-only candidate.
 """
     doi = clean_doi(doi)
     if not doi:
@@ -774,8 +780,8 @@ Args:
     orcid: A bare ORCID iD or ORCID URL.
 
 Returns:
-    A list of Smeli candidate dictionaries, sorted by OpenAlex publication date
-    descending before later Smeli ranking/merging.
+    list[dict[str, Any]]: A list of Smeli candidate dictionaries, sorted by
+        OpenAlex publication date descending before later Smeli ranking/merging.
 
 Notes:
     ORCID identifies a person, not a paper, so this function returns a list of
@@ -819,9 +825,10 @@ Args:
     identifier: A scholarly identifier or resolver URL.
 
 Returns:
-    A list of Smeli candidate dictionaries. Paper identifiers usually return
-    zero or one candidate. ORCID identifiers may return many candidates because
-    they identify an author/person rather than a paper.
+    list[dict[str, Any]]: A list of Smeli candidate dictionaries. Paper
+        identifiers usually return zero or one candidate. ORCID identifiers may
+        return many candidates because they identify an author/person rather
+        than a paper.
 """
     identifier = identifier.strip()
     if not identifier:
@@ -865,9 +872,9 @@ Args:
         supplied.
 
 Returns:
-    A score-sorted list of merged Smeli candidate dictionaries. Duplicate paper
-    records from multiple sources are collapsed and annotated with
-    ``metadata_sources``.
+    list[dict[str, Any]]: A score-sorted list of merged Smeli candidate
+        dictionaries. Duplicate paper records from multiple sources are
+        collapsed and annotated with ``metadata_sources``.
 
 Notes:
     This is the highest-level public lookup API. It may print progress messages
@@ -967,12 +974,13 @@ Args:
     year: Optional publication year.
 
 Returns:
-    Crossref candidate dictionaries filtered to records with a DOI.
+    list[dict[str, Any]]: Crossref candidate dictionaries filtered to records
+        with a DOI.
 
 Notes:
     This is a compatibility/convenience helper from Smeli's DOI-focused origins.
-    New code usually wants :func:`get_paper_candidates_from_crossref` or
-    :func:`get_paper_candidates` instead.
+    New code usually wants `get_paper_candidates_from_crossref()` or
+    `get_paper_candidates()` instead.
 """
     return [
         candidate
@@ -993,12 +1001,13 @@ Args:
     year: Optional publication year.
 
 Returns:
-    OpenAlex candidate dictionaries filtered to records with a DOI.
+    list[dict[str, Any]]: OpenAlex candidate dictionaries filtered to records
+        with a DOI.
 
 Notes:
     This is a compatibility/convenience helper from Smeli's DOI-focused origins.
-    New code usually wants :func:`get_paper_candidates_from_openalex` or
-    :func:`get_paper_candidates` instead.
+    New code usually wants `get_paper_candidates_from_openalex()` or
+    `get_paper_candidates()` instead.
 """
     return [
         candidate

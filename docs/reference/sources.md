@@ -1,7 +1,5 @@
 # `smeli.sources`
 
-Networked metadata lookups and cross-source search orchestration.
-
 ::: smeli.sources
     options:
       show_root_heading: false

@@ -97,9 +97,9 @@ Args:
         allowed.
 
 Returns:
-    A new dictionary with normalized DOI/arXiv identifiers, default values for
-    common optional fields, a ``metadata_sources`` list, and a best-effort
-    landing ``url`` when an identifier is available.
+    dict[str, Any]: A new dictionary with normalized DOI/arXiv identifiers,
+        default values for common optional fields, a ``metadata_sources`` list,
+        and a best-effort landing ``url`` when an identifier is available.
 
 Notes:
     The input dictionary is copied before modification.
@@ -365,9 +365,9 @@ def candidate_score(
         year: Optional publication year supplied by the user.
 
     Returns:
-        A ``(score, citation_bonus)`` tuple. ``score`` reflects local
-        bibliographic relevance; ``citation_bonus`` is a weak tie-breaker
-        derived from citation count.
+        tuple[int, int]: A ``(score, citation_bonus)`` tuple. ``score``
+            reflects local bibliographic relevance; ``citation_bonus`` is a weak
+            tie-breaker derived from citation count.
 
     Notes:
         The score is intentionally heuristic. It is useful for ranking plausible
@@ -507,8 +507,8 @@ Args:
     b: Second Smeli candidate dictionary.
 
 Returns:
-    ``True`` if the candidates share a DOI, arXiv ID, OpenAlex ID, or have a
-    strong title/year/author match; otherwise ``False``.
+    bool: ``True`` if the candidates share a DOI, arXiv ID, OpenAlex ID, or have
+        a strong title/year/author match; otherwise ``False``.
 """
     doi_a = clean_doi(a.get("doi"))
     doi_b = clean_doi(b.get("doi"))
@@ -549,12 +549,12 @@ Args:
     secondary: A second candidate record used to fill gaps and add sources.
 
 Returns:
-    A canonicalized candidate dictionary containing the best available fields
-    from both inputs.
+    dict[str, Any]: A canonicalized candidate dictionary containing the best
+        available fields from both inputs.
 
 Notes:
     This function does not first verify that the records match. Call
-    :func:`candidates_are_same` before merging untrusted pairs.
+    `candidates_are_same()` before merging untrusted pairs.
 """
     merged = dict(primary)
 
@@ -615,8 +615,9 @@ Args:
     candidates: Candidate records from one or more source APIs.
 
 Returns:
-    A list of canonicalized candidate records with likely duplicates collapsed
-    using :func:`candidates_are_same` and :func:`merge_candidates`.
+    list[dict[str, Any]]: A list of canonicalized candidate records with likely
+        duplicates collapsed using `candidates_are_same()` and
+        `merge_candidates()`.
 """
     merged: list[dict[str, Any]] = []
 
@@ -635,7 +636,11 @@ Returns:
 
     return merged
 
-def bibliographic_query(author: str | None, title: str | None, year: str | int | None) -> str:
+def bibliographic_query(
+    author: str | None = None,
+    title: str | None = None,
+    year: str | int | None = None,
+) -> str:
     """Build a compact bibliographic query string from available fields.
 
 Args:
@@ -644,8 +649,8 @@ Args:
     year: Optional publication year.
 
 Returns:
-    A single space-separated query string containing non-empty fields in
-    title-author-year order.
+    str: A single space-separated query string containing non-empty fields in
+        title-author-year order.
 """
     parts = []
     if title:

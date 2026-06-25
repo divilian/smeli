@@ -1,7 +1,7 @@
 """Command-line interface for Smeli.
 
 The library-facing public API of this module is intentionally tiny:
-:func:`main` is the console-script entrypoint used by the ``smeli`` command.
+`main()` is the console-script entrypoint used by the ``smeli`` command.
 Display helpers, prompts, color constants, and one-shot argument handling are
 private implementation details.
 """
@@ -451,8 +451,8 @@ Args:
         ``None``, arguments are read from ``sys.argv``.
 
 Returns:
-    ``None``. Results are printed to standard output and interactive prompts
-    read from standard input.
+    None: Results are printed to standard output and interactive prompts read
+        from standard input.
 
 Notes:
     Normal package users should prefer the lookup functions in

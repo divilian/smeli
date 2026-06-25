@@ -40,8 +40,8 @@ Args:
     value: A DOI-like string, DOI URL, ``doi:``-prefixed value, or ``None``.
 
 Returns:
-    The normalized bare DOI, preserving DOI case where present, or ``None`` if
-    the input is empty or does not contain a valid-looking DOI.
+    str | None: The normalized bare DOI, preserving DOI case where present, or
+        ``None`` if the input is empty or does not contain a valid-looking DOI.
 
 Examples:
     ``clean_doi("https://doi.org/10.1126/science.1102081")`` returns
@@ -77,7 +77,8 @@ Args:
     value: Text that may contain a bare DOI or DOI resolver URL.
 
 Returns:
-    ``True`` when :func:`clean_doi` can extract a DOI; otherwise ``False``.
+    bool: ``True`` when `clean_doi()` can extract a DOI; otherwise
+        ``False``.
 """
     doi = clean_doi(value)
     return bool(doi and re.match(r"^10\.\S+/\S+$", doi, re.IGNORECASE))
@@ -92,8 +93,9 @@ Args:
         nested candidate/source record that may contain an ORCID value.
 
 Returns:
-    The normalized bare ORCID iD, such as ``"0000-0002-0254-6627"``, or
-    ``None`` when no ORCID-like identifier is present.
+    str | None: The normalized bare ORCID iD, such as
+        ``"0000-0002-0254-6627"``, or ``None`` when no ORCID-like identifier is
+        present.
 """
     if not value:
         return None
@@ -129,8 +131,8 @@ Args:
     value: Text that may contain an ORCID identifier.
 
 Returns:
-    ``True`` when :func:`extract_orcid` can extract an ORCID iD; otherwise
-    ``False``.
+    bool: ``True`` when `extract_orcid()` can extract an ORCID iD;
+        otherwise ``False``.
 """
     return extract_orcid(value) is not None
 
@@ -141,8 +143,9 @@ Args:
     orcid: A bare ORCID iD, ORCID URL, or other ORCID-like text.
 
 Returns:
-    A canonical URL such as ``"https://orcid.org/0000-0002-0254-6627"``, or
-    ``None`` if the input does not contain an ORCID iD.
+    str | None: A canonical URL such as
+        ``"https://orcid.org/0000-0002-0254-6627"``, or ``None`` if the input
+        does not contain an ORCID iD.
 """
     bare = extract_orcid(orcid)
     if not bare:
@@ -259,8 +262,8 @@ Args:
         arXiv abstract/PDF URL.
 
 Returns:
-    The arXiv ID as written, including a version suffix when present, or
-    ``None`` when no arXiv identifier is present.
+    str | None: The arXiv ID as written, including a version suffix when
+        present, or ``None`` when no arXiv identifier is present.
 """
     if not value:
         return None
@@ -301,8 +304,8 @@ Args:
     arxiv_id: An arXiv identifier such as ``"2501.01234v2"``.
 
 Returns:
-    The identifier without its trailing version suffix, such as
-    ``"2501.01234"``, or ``None`` for empty input.
+    str | None: The identifier without its trailing version suffix, such as
+        ``"2501.01234"``, or ``None`` for empty input.
 """
     if not arxiv_id:
         return None
@@ -339,8 +342,7 @@ Args:
         URL wrapper, or version suffix.
 
 Returns:
-    The canonical abstract URL. Empty or unparseable input produces the empty
-    string.
+    str: The canonical abstract URL, or the empty string if the input is empty.
 """
     return f"https://arxiv.org/abs/{arxiv_id}" if arxiv_id else ""
 

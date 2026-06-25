@@ -68,3 +68,9 @@ def test_merge_candidate_list_deduplicates_related_records():
     merged = smeli.merge_candidate_list(candidates)
     assert len(merged) == 1
     assert merged[0]["metadata_sources"] == ["OpenAlex", "arXiv"]
+
+
+def test_bibliographic_query_allows_omitted_fields():
+    assert smeli.bibliographic_query(title="Attention Is All You Need") == "Attention Is All You Need"
+    assert smeli.bibliographic_query(author="Vaswani", year=2017) == "Vaswani 2017"
+    assert smeli.bibliographic_query() == ""
