@@ -49,6 +49,7 @@ def test_top_level_all_exposes_package_api_without_private_helpers():
     assert "get_paper_candidates" in smeli.__all__
     assert "get_metadata" in smeli.__all__
     assert "get_orcids" in smeli.__all__
+    assert "search_orcids" in smeli.__all__
     assert "get_best_structured_metadata" not in smeli.__all__
     assert not hasattr(smeli, "get_best_structured_metadata")
     assert "clean_doi" in smeli.__all__

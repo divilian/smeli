@@ -8,6 +8,7 @@
         - get_paper_candidates
         - get_metadata
         - get_orcids
+        - search_orcids
         - get_paper_candidates_from_identifier
         - get_candidate_from_doi
         - get_candidate_from_arxiv_id

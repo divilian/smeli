@@ -5,7 +5,7 @@ Smeli's public API is defined by each module's `__all__` list. Names not include
 The top-level package re-exports the public library API, so this is the normal import style:
 
 ```python
-from smeli import get_paper_candidates, clean_doi, candidate_to_bibtex
+from smeli import get_paper_candidates, search_orcids, candidate_to_bibtex
 ```
 
 You can also import from specific modules when that makes the code clearer:
@@ -43,7 +43,7 @@ from smeli import get_paper_candidates_from_identifier
 papers = get_paper_candidates_from_identifier("0000-0002-0254-6627")
 ```
 
-Use `get_candidate_from_doi()`, `get_candidate_from_arxiv_id()`, or `get_candidate_from_openalex_id()` when your code already knows it is resolving a specific paper identifier.
+Use `get_candidate_from_doi()`, `get_candidate_from_arxiv_id()`, or `get_candidate_from_openalex_id()` when your code already knows it is resolving a specific paper identifier. Use `search_orcids()` when you have an author name fragment and want possible author/ORCID matches.
 
 ## Return conventions
 
@@ -52,7 +52,8 @@ Smeli uses simple Python data structures:
 - candidate lookups return `list[dict[str, Any]]`
 - single-paper lookups return `dict[str, Any] | None`
 - metadata lookups return `dict[str, Any] | None`
-- ORCID helpers return `list[dict[str, str]]`
+- `get_orcids()` returns `list[str]`
+- source-specific ORCID helpers and `search_orcids()` return `list[dict[str, Any]]`
 - BibTeX lookup returns `str | None`
 
 Expected misses return `None` or `[]`. Real network or parsing problems may also print short diagnostic messages.

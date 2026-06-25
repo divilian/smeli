@@ -145,3 +145,101 @@ def test_get_paper_candidates_from_orcid_uses_openalex_orcid_filter(monkeypatch)
     assert captured["kwargs"]["params"]["sort"] == "publication_date:desc"
     assert results[0]["title"] == "Still building the memex"
     assert results[0]["match_note"] == "ORCID 0000-0002-0254-6627"
+
+
+def test_search_orcids_uses_openalex_author_search_and_returns_orcid_records(monkeypatch):
+    captured = {}
+
+    def fake_fetch_json(url, *, source="request", **kwargs):
+        captured["url"] = url
+        captured["source"] = source
+        captured["kwargs"] = kwargs
+        return {
+            "results": [
+                {
+                    "id": "https://openalex.org/A123",
+                    "display_name": "Stephen Davies",
+                    "orcid": "https://orcid.org/0000-0002-0254-6627",
+                    "works_count": 12,
+                    "cited_by_count": 34,
+                    "last_known_institutions": [
+                        {"display_name": "University of Mary Washington"}
+                    ],
+                    "relevance_score": 98.7,
+                },
+                {
+                    "id": "https://openalex.org/A999",
+                    "display_name": "Stephen Davies Without Orcid",
+                    "works_count": 1,
+                },
+            ]
+        }
+
+    monkeypatch.setattr(smeli.sources, "_fetch_json", fake_fetch_json)
+
+    results = smeli.search_orcids("Stephen Davies")
+
+    assert captured["url"] == "https://api.openalex.org/authors"
+    assert captured["source"] == "OpenAlex"
+    assert captured["kwargs"]["params"]["search"] == "Stephen Davies"
+    assert captured["kwargs"]["params"]["per-page"] == 10
+    assert results == [
+        {
+            "name": "Stephen Davies",
+            "orcid": "0000-0002-0254-6627",
+            "orcid_url": "https://orcid.org/0000-0002-0254-6627",
+            "openalex_id": "https://openalex.org/A123",
+            "affiliation": "University of Mary Washington",
+            "affiliations": ["University of Mary Washington"],
+            "works_count": 12,
+            "cited_by_count": 34,
+            "source": "OpenAlex",
+            "relevance": 98.7,
+        }
+    ]
+
+
+def test_search_orcids_applies_affiliation_filter_and_deduplicates(monkeypatch):
+    def fake_fetch_json(url, *, source="request", **kwargs):
+        return {
+            "results": [
+                {
+                    "id": "https://openalex.org/A1",
+                    "display_name": "Ada Lovelace",
+                    "orcid": "https://orcid.org/0000-0002-0254-6627",
+                    "last_known_institutions": [{"display_name": "Wrong University"}],
+                },
+                {
+                    "id": "https://openalex.org/A2",
+                    "display_name": "Ada Lovelace",
+                    "orcid": "https://orcid.org/0000-0002-0254-6627",
+                    "affiliations": [
+                        {"institution": {"display_name": "University of Mary Washington"}}
+                    ],
+                },
+                {
+                    "id": "https://openalex.org/A3",
+                    "display_name": "Ada Byron",
+                    "orcid": "https://orcid.org/0000-0001-2345-678X",
+                    "last_known_institutions": [{"display_name": "University of Mary Washington"}],
+                },
+            ]
+        }
+
+    monkeypatch.setattr(smeli.sources, "_fetch_json", fake_fetch_json)
+
+    results = smeli.search_orcids("Ada", affiliation="mary washington", max_results=5)
+
+    assert [result["orcid"] for result in results] == [
+        "0000-0002-0254-6627",
+        "0000-0001-2345-678X",
+    ]
+
+
+def test_search_orcids_returns_empty_for_blank_name_without_request(monkeypatch):
+    def fail_fetch_json(*args, **kwargs):
+        raise AssertionError("should not request OpenAlex for a blank author name")
+
+    monkeypatch.setattr(smeli.sources, "_fetch_json", fail_fetch_json)
+
+    assert smeli.search_orcids("  ") == []

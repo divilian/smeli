@@ -15,6 +15,7 @@ __all__ = [
     "get_paper_candidates_from_identifier",
     "get_metadata",
     "get_orcids",
+    "search_orcids",
     "get_candidate_from_doi",
     "get_candidate_from_arxiv_id",
     "get_candidate_from_openalex_id",
@@ -346,6 +347,138 @@ def get_orcids(value: Any | None) -> list[str]:
         for orcid in _orcid_ids_from_records(records):
             _add_orcid_id(orcids, orcid)
     return orcids
+
+def _text_matches_affiliation(texts: list[str], affiliation: str | None) -> bool:
+    """Return whether affiliation text matches a caller-supplied fragment."""
+    if not affiliation:
+        return True
+    needle = affiliation.strip().casefold()
+    if not needle:
+        return True
+    return any(needle in text.casefold() for text in texts)
+
+
+def _openalex_author_affiliations(author: Mapping[str, Any]) -> list[str]:
+    """Return institution display names from an OpenAlex author record."""
+    affiliations: list[str] = []
+
+    def add_name(value: Any) -> None:
+        if isinstance(value, str):
+            name = value.strip()
+        elif isinstance(value, Mapping):
+            name = str(value.get("display_name") or "").strip()
+        else:
+            name = ""
+        if name and name not in affiliations:
+            affiliations.append(name)
+
+    for institution in author.get("last_known_institutions") or []:
+        add_name(institution)
+
+    add_name(author.get("last_known_institution"))
+
+    for affiliation in author.get("affiliations") or []:
+        if not isinstance(affiliation, Mapping):
+            continue
+        institution = affiliation.get("institution")
+        add_name(institution)
+
+    return affiliations
+
+
+def _openalex_author_to_orcid_result(author: Mapping[str, Any]) -> dict[str, Any] | None:
+    """Convert an OpenAlex author record to a Smeli ORCID search result."""
+    orcid = extract_orcid(author.get("orcid"))
+    if not orcid:
+        return None
+
+    affiliations = _openalex_author_affiliations(author)
+    result: dict[str, Any] = {
+        "name": str(author.get("display_name") or "").strip(),
+        "orcid": orcid,
+        "orcid_url": orcid_url(orcid),
+        "openalex_id": author.get("id", ""),
+        "affiliation": affiliations[0] if affiliations else "",
+        "affiliations": affiliations,
+        "works_count": author.get("works_count", 0),
+        "cited_by_count": author.get("cited_by_count", 0),
+        "source": "OpenAlex",
+    }
+    relevance = author.get("relevance_score")
+    if isinstance(relevance, (int, float)):
+        result["relevance"] = relevance
+    return result
+
+
+def search_orcids(
+    name: str | None,
+    affiliation: str | None = None,
+    max_results: int = 10,
+) -> list[dict[str, Any]]:
+    """Search for author ORCID iDs by partial author name.
+
+    Args:
+        name: Author name or name fragment to search for.
+        affiliation: Optional institution or affiliation fragment used for
+            local filtering of returned author candidates.
+        max_results: Maximum number of ORCID-bearing candidate records to
+            return.
+
+    Returns:
+        list[dict[str, Any]]: Candidate author records with keys such as
+            ``name``, ``orcid``, ``orcid_url``, ``openalex_id``,
+            ``affiliation``, ``affiliations``, ``works_count``,
+            ``cited_by_count``, ``source``, and sometimes ``relevance``.
+
+    Notes:
+        This searches OpenAlex author records. It returns candidate people, not
+        papers, and deliberately excludes author records without ORCID iDs.
+    """
+    query = str(name or "").strip()
+    if not query:
+        return []
+
+    try:
+        requested = int(max_results)
+    except (TypeError, ValueError):
+        requested = 10
+    requested = max(1, min(requested, _MAX_CANDIDATES_PER_SOURCE))
+
+    # Fetch a few extra records when affiliation filtering is requested, since
+    # some high-ranked name matches may be filtered out locally.
+    per_page = requested
+    if affiliation and affiliation.strip():
+        per_page = min(_MAX_CANDIDATES_PER_SOURCE, requested * 3)
+
+    url = "https://api.openalex.org/authors"
+    params: dict[str, Any] = {
+        "search": query,
+        "per-page": per_page,
+    }
+    data = _fetch_json(url, source="OpenAlex", params=_openalex_params(params))
+    if not data:
+        return []
+
+    results: list[dict[str, Any]] = []
+    seen_orcids: set[str] = set()
+    for author in data.get("results", []):
+        if not isinstance(author, Mapping):
+            continue
+        result = _openalex_author_to_orcid_result(author)
+        if not result:
+            continue
+        orcid = result["orcid"]
+        if orcid in seen_orcids:
+            continue
+        if not _text_matches_affiliation(result.get("affiliations", []), affiliation):
+            continue
+        seen_orcids.add(orcid)
+        results.append(result)
+        if len(results) >= requested:
+            break
+
+    return results
+
 
 def get_orcids_from_openalex(doi: str) -> list[dict[str, str]]:
     """Extract author ORCIDs for a DOI using OpenAlex.
