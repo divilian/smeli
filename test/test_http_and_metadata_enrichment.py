@@ -90,11 +90,110 @@ def test_get_metadata_from_datacite_shapes_response(monkeypatch):
     assert metadata["type"] == "Preprint"
 
 
-def test_get_best_structured_metadata_falls_back_to_datacite(monkeypatch):
+def test_get_metadata_falls_back_to_datacite(monkeypatch):
     monkeypatch.setattr(smeli.sources, "get_metadata_from_crossref", lambda value: None)
     monkeypatch.setattr(smeli.sources, "get_metadata_from_datacite", lambda value: {"source": "DataCite", "doi": value})
-    assert smeli.get_best_structured_metadata("10.48550/arXiv.2507.11521")["source"] == "DataCite"
+    assert smeli.get_metadata("10.48550/arXiv.2507.11521")["source"] == "DataCite"
 
+
+
+def test_get_metadata_uses_openalex_for_doi_when_doi_registries_miss(monkeypatch):
+    monkeypatch.setattr(smeli.sources, "get_metadata_from_crossref", lambda value: None)
+    monkeypatch.setattr(smeli.sources, "get_metadata_from_datacite", lambda value: None)
+    monkeypatch.setattr(
+        smeli.sources,
+        "_get_candidate_from_openalex_doi",
+        lambda value: {
+            "source": "OpenAlex",
+            "doi": value,
+            "title": "OpenAlex paper",
+            "authors": ["Ada Lovelace"],
+            "venue": "Journal of Tests",
+            "cited_by_count": 12,
+            "year": 2024,
+            "url": "https://example.org/paper",
+        },
+    )
+
+    metadata = smeli.get_metadata("10.9999/example")
+
+    assert metadata["source"] == "OpenAlex"
+    assert metadata["title"] == "OpenAlex paper"
+    assert metadata["journal"] == "Journal of Tests"
+    assert metadata["citations"] == 12
+
+
+def test_get_metadata_resolves_arxiv_and_openalex_identifiers(monkeypatch):
+    monkeypatch.setattr(
+        smeli.sources,
+        "get_candidate_from_arxiv_id",
+        lambda value: {"source": "arXiv", "arxiv_id": value, "title": "arXiv paper"},
+    )
+    monkeypatch.setattr(
+        smeli.sources,
+        "get_candidate_from_openalex_id",
+        lambda value: {"source": "OpenAlex", "openalex_id": value, "title": "OpenAlex paper"},
+    )
+
+    assert smeli.get_metadata("arXiv:2507.11521")["source"] == "arXiv"
+    assert smeli.get_metadata("W2741809807")["source"] == "OpenAlex"
+
+
+def test_get_orcids_deduplicates_across_doi_sources(monkeypatch):
+    monkeypatch.setattr(
+        smeli.sources,
+        "get_orcids_from_openalex",
+        lambda value: [{"name": "Ada", "orcid": "https://orcid.org/0000-0002-0254-6627"}],
+    )
+    monkeypatch.setattr(
+        smeli.sources,
+        "get_orcids_from_crossref",
+        lambda value: [{"name": "Ada", "orcid": "0000-0002-0254-6627"}],
+    )
+    monkeypatch.setattr(
+        smeli.sources,
+        "get_orcids_from_datacite",
+        lambda value: [{"name": "Grace", "orcid": "0000-0001-2345-678X"}],
+    )
+
+    assert smeli.get_orcids("10.1234/example") == [
+        "0000-0002-0254-6627",
+        "0000-0001-2345-678X",
+    ]
+
+
+def test_get_orcids_accepts_records_and_orcid_strings():
+    assert smeli.get_orcids("https://orcid.org/0000-0002-0254-662x") == ["0000-0002-0254-662X"]
+    assert smeli.get_orcids({"authors": [{"ORCID": "0000-0002-0254-6627"}]}) == [
+        "0000-0002-0254-6627"
+    ]
+
+
+def test_get_orcids_from_datacite_extracts_creator_name_identifiers(monkeypatch):
+    def fake_fetch_json(url, *, source="request", **kwargs):
+        return {
+            "data": {
+                "attributes": {
+                    "creators": [
+                        {
+                            "name": "Lovelace, Ada",
+                            "nameIdentifiers": [
+                                {
+                                    "nameIdentifier": "https://orcid.org/0000-0002-0254-6627",
+                                    "nameIdentifierScheme": "ORCID",
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        }
+
+    monkeypatch.setattr(smeli.sources, "_fetch_json", fake_fetch_json)
+
+    assert smeli.get_orcids_from_datacite("10.5281/zenodo.2647458") == [
+        {"name": "Lovelace, Ada", "orcid": "0000-0002-0254-6627"}
+    ]
 
 def test_get_bibtex_from_doi_uses_doi_org_accept_header(monkeypatch):
     captured = {}
@@ -151,11 +250,11 @@ def test_get_metadata_from_crossref_silences_404(monkeypatch, capsys):
     assert capsys.readouterr().out == ""
 
 
-def test_get_best_structured_metadata_fallback_is_quiet(monkeypatch, capsys):
+def test_get_metadata_fallback_is_quiet(monkeypatch, capsys):
     monkeypatch.setattr(smeli.sources, "get_metadata_from_crossref", lambda value: None)
     monkeypatch.setattr(smeli.sources, "get_metadata_from_datacite", lambda value: {"source": "DataCite", "doi": value})
 
-    metadata = smeli.get_best_structured_metadata("10.5281/zenodo.2647458")
+    metadata = smeli.get_metadata("10.5281/zenodo.2647458")
 
     assert metadata["source"] == "DataCite"
     assert capsys.readouterr().out == ""
@@ -185,5 +284,19 @@ def test_get_orcids_from_openalex_silences_missing_work_404(monkeypatch, capsys)
     monkeypatch.setattr(smeli.sources, "_fetch_json", fake_fetch_json)
 
     assert smeli.get_orcids_from_openalex("10.9999/not-in-openalex") == []
+    assert captured["kwargs"]["quiet_statuses"] == {404}
+    assert capsys.readouterr().out == ""
+
+
+def test_get_orcids_from_datacite_silences_404(monkeypatch, capsys):
+    captured = {}
+
+    def fake_fetch_json(url, *, source="request", **kwargs):
+        captured["kwargs"] = kwargs
+        return None
+
+    monkeypatch.setattr(smeli.sources, "_fetch_json", fake_fetch_json)
+
+    assert smeli.get_orcids_from_datacite("10.1145/1897816.1897840") == []
     assert captured["kwargs"]["quiet_statuses"] == {404}
     assert capsys.readouterr().out == ""

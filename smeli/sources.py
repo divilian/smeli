@@ -11,30 +11,31 @@ errors may print short diagnostic messages.
 from __future__ import annotations
 
 __all__ = [
+    "get_paper_candidates",
+    "get_paper_candidates_from_identifier",
+    "get_metadata",
+    "get_orcids",
+    "get_candidate_from_doi",
+    "get_candidate_from_arxiv_id",
+    "get_candidate_from_openalex_id",
+    "get_paper_candidates_from_orcid",
+    "get_paper_candidates_from_openalex",
+    "get_paper_candidates_from_crossref",
+    "get_paper_candidates_from_datacite",
+    "get_paper_candidates_from_arxiv",
     "get_metadata_from_crossref",
     "get_metadata_from_datacite",
-    "get_best_structured_metadata",
     "get_bibtex_from_doi",
     "get_orcids_from_openalex",
     "get_orcids_from_crossref",
-    "get_paper_candidates_from_crossref",
-    "get_paper_candidates_from_openalex",
-    "get_paper_candidates_from_datacite",
-    "get_paper_candidates_from_arxiv",
-    "get_candidate_from_openalex_id",
-    "get_candidate_from_arxiv_id",
-    "get_candidate_from_doi",
-    "get_paper_candidates_from_orcid",
-    "get_paper_candidates_from_identifier",
-    "get_paper_candidates",
+    "get_orcids_from_datacite",
     "get_doi_from_crossref",
     "get_doi_from_openalex",
 ]
 
-
 import re
 import xml.etree.ElementTree as ET
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any
 from urllib.parse import quote
 
@@ -170,26 +171,84 @@ def get_metadata_from_datacite(doi: str) -> dict[str, Any] | None:
         "url": attributes.get("url", ""),
     }
 
-def get_best_structured_metadata(doi: str) -> dict[str, Any] | None:
-    """Fetch structured DOI metadata from the best available DOI source.
+def _metadata_from_candidate(candidate: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Return a structured metadata dictionary from a Smeli candidate."""
+    if not candidate:
+        return None
+
+    metadata: dict[str, Any] = {
+        "source": candidate.get("source", ""),
+        "doi": candidate.get("doi"),
+        "title": candidate.get("title", ""),
+        "authors": candidate.get("authors", []),
+        "journal": candidate.get("venue", ""),
+        "publisher": candidate.get("publisher", ""),
+        "citations": candidate.get("cited_by_count", 0),
+        "year": candidate.get("year"),
+        "type": candidate.get("type", ""),
+        "url": candidate.get("url", ""),
+    }
+    if candidate.get("arxiv_id"):
+        metadata["arxiv_id"] = candidate["arxiv_id"]
+    if candidate.get("openalex_id"):
+        metadata["openalex_id"] = candidate["openalex_id"]
+    return metadata
+
+def _get_candidate_from_openalex_doi(doi: str) -> dict[str, Any] | None:
+    """Fetch a Smeli candidate for a DOI directly from OpenAlex."""
+    doi = clean_doi(doi)
+    if not doi:
+        return None
+
+    openalex_work_id = quote(f"doi:{doi}", safe=":")
+    url = f"https://api.openalex.org/works/{openalex_work_id}"
+    data = _fetch_json(url, source="OpenAlex", params=_openalex_params(), quiet_statuses={404})
+    if not data:
+        return None
+
+    return _openalex_item_to_candidate(data)
+
+def get_metadata(identifier: str | None) -> dict[str, Any] | None:
+    """Fetch structured metadata for a DOI, arXiv ID, or OpenAlex Work ID.
 
     Args:
-        doi: A bare DOI, DOI URL, or DOI-like string.
+        identifier: A DOI, DOI URL, arXiv ID/URL, or OpenAlex Work ID/URL.
 
     Returns:
-        dict[str, Any] | None: A Crossref metadata dictionary when Crossref has
-            a usable record; otherwise a DataCite metadata dictionary; otherwise
-            ``None``.
+        dict[str, Any] | None: A source-agnostic metadata dictionary when Smeli
+            finds usable metadata, or ``None`` when no configured source has a
+            usable record.
 
     Notes:
-        Crossref is tried first because it is usually best for article and
-        conference metadata. DataCite is used as the fallback.
+        DOI lookup tries Crossref first, then DataCite, then OpenAlex. arXiv and
+        OpenAlex identifiers are resolved through their native APIs. Source-
+        specific helpers remain available when callers deliberately want a
+        particular service.
     """
-    metadata = get_metadata_from_crossref(doi)
-    if metadata is not None:
-        return metadata
+    value = str(identifier or "").strip()
+    if not value:
+        return None
 
-    return get_metadata_from_datacite(doi)
+    if looks_like_doi(value):
+        doi = clean_doi(value)
+        metadata = get_metadata_from_crossref(doi)
+        if metadata is not None:
+            return metadata
+
+        metadata = get_metadata_from_datacite(doi)
+        if metadata is not None:
+            return metadata
+
+        return _metadata_from_candidate(_get_candidate_from_openalex_doi(doi))
+
+    arxiv_id = extract_arxiv_id(value)
+    if arxiv_id:
+        return _metadata_from_candidate(get_candidate_from_arxiv_id(arxiv_id))
+
+    if "openalex.org/" in value.lower() or re.fullmatch(r"W\d+", value, re.IGNORECASE):
+        return _metadata_from_candidate(get_candidate_from_openalex_id(value))
+
+    return None
 
 def get_bibtex_from_doi(doi: str) -> str | None:
     """Retrieve BibTeX from doi.org content negotiation.
@@ -212,6 +271,81 @@ def get_bibtex_from_doi(doi: str) -> str | None:
     url = f"https://doi.org/{_quote_doi_for_doi_org(doi)}"
     headers = {"Accept": "application/x-bibtex"}
     return _fetch_text(url, source="doi.org BibTeX", headers=headers)
+
+def _add_orcid_id(orcids: list[str], value: Any) -> None:
+    """Append a normalized ORCID iD if it is present and not already listed."""
+    orcid = extract_orcid(value)
+    if orcid and orcid not in orcids:
+        orcids.append(orcid)
+
+def _orcid_ids_from_nested_value(value: Any) -> list[str]:
+    """Return all normalized ORCID iDs found in a nested value."""
+    orcids: list[str] = []
+    if isinstance(value, str):
+        _add_orcid_id(orcids, value)
+    elif isinstance(value, Mapping):
+        for item in value.values():
+            for orcid in _orcid_ids_from_nested_value(item):
+                _add_orcid_id(orcids, orcid)
+    elif isinstance(value, (list, tuple, set)):
+        for item in value:
+            for orcid in _orcid_ids_from_nested_value(item):
+                _add_orcid_id(orcids, orcid)
+    return orcids
+
+def _orcid_ids_from_records(records: list[dict[str, str]] | list[str]) -> list[str]:
+    """Return normalized ORCID iDs from source-specific ORCID records."""
+    orcids: list[str] = []
+    for record in records:
+        if isinstance(record, Mapping):
+            _add_orcid_id(orcids, record.get("orcid"))
+        else:
+            _add_orcid_id(orcids, record)
+    return orcids
+
+def get_orcids(value: Any | None) -> list[str]:
+    """Return normalized ORCID iDs from an identifier or metadata record.
+
+    Args:
+        value: A DOI, ORCID iD/URL, or a nested metadata/candidate record that
+            may contain ORCID values.
+
+    Returns:
+        list[str]: Normalized bare ORCID iDs, deduplicated in discovery order.
+
+    Notes:
+        DOI lookup checks OpenAlex, Crossref, and DataCite. Source-specific
+        helpers return richer ``{"name": ..., "orcid": ...}`` records; this
+        high-level helper returns just the normalized identifiers.
+    """
+    if value is None:
+        return []
+
+    if not isinstance(value, str):
+        return _orcid_ids_from_nested_value(value)
+
+    text = value.strip()
+    if not text:
+        return []
+
+    if looks_like_orcid(text):
+        orcid = extract_orcid(text)
+        return [orcid] if orcid else []
+
+    if not looks_like_doi(text):
+        metadata = get_metadata(text)
+        return _orcid_ids_from_nested_value(metadata) if metadata else []
+
+    doi = clean_doi(text)
+    orcids: list[str] = []
+    for records in (
+        get_orcids_from_openalex(doi),
+        get_orcids_from_crossref(doi),
+        get_orcids_from_datacite(doi),
+    ):
+        for orcid in _orcid_ids_from_records(records):
+            _add_orcid_id(orcids, orcid)
+    return orcids
 
 def get_orcids_from_openalex(doi: str) -> list[dict[str, str]]:
     """Extract author ORCIDs for a DOI using OpenAlex.
@@ -242,8 +376,9 @@ Returns:
         # If OpenAlex has an ORCID for this author, it will usually be a full URL.
         if orcid_url:
             name = author.get("display_name", "").strip()
-            orcid_id = orcid_url.split("/")[-1]
-            orcids.append({"name": name, "orcid": orcid_id})
+            orcid_id = extract_orcid(orcid_url)
+            if orcid_id:
+                orcids.append({"name": name, "orcid": orcid_id})
 
     return orcids
 
@@ -276,7 +411,49 @@ def get_orcids_from_crossref(doi: str) -> list[dict[str, str]]:
         # If the publisher provided an ORCID, it will be here.
         if "ORCID" in author:
             name = f"{author.get('given', '')} {author.get('family', '')}".strip()
-            orcid_id = author["ORCID"].split("/")[-1]
+            orcid_id = extract_orcid(author["ORCID"])
+            if orcid_id:
+                orcids.append({"name": name, "orcid": orcid_id})
+
+    return orcids
+
+def get_orcids_from_datacite(doi: str) -> list[dict[str, str]]:
+    """Extract author ORCIDs from DataCite metadata.
+
+    Args:
+        doi: A bare DOI, DOI URL, or DOI-like string.
+
+    Returns:
+        list[dict[str, str]]: A list of dictionaries with ``name`` and
+            ``orcid`` keys, or an empty list when DataCite has no ORCID data for
+            the paper.
+
+    Notes:
+        DataCite ORCID coverage is common for repository and dataset records,
+        but still depends on what the depositing source supplied.
+    """
+    doi = clean_doi(doi)
+    if not doi:
+        return []
+
+    url = f"https://api.datacite.org/dois/{_quote_doi_for_path(doi)}"
+    data = _fetch_json(url, source="DataCite", quiet_statuses={404})
+    if not data:
+        return []
+
+    attributes = data.get("data", {}).get("attributes", {})
+    creators = attributes.get("creators", []) if isinstance(attributes, dict) else []
+    orcids: list[dict[str, str]] = []
+    seen: set[str] = set()
+
+    for creator in creators:
+        if not isinstance(creator, dict):
+            continue
+        name = creator.get("name") or f"{creator.get('givenName', '')} {creator.get('familyName', '')}".strip()
+        for orcid_id in _orcid_ids_from_nested_value(creator):
+            if orcid_id in seen:
+                continue
+            seen.add(orcid_id)
             orcids.append({"name": name, "orcid": orcid_id})
 
     return orcids
@@ -605,13 +782,9 @@ Returns:
         candidates.append(canonical_candidate(candidate))
 
     # OpenAlex may have ORCIDs, citation counts, and a better landing page.
-    openalex_work_id = quote(f"doi:{doi}", safe=":")
-    openalex_url = f"https://api.openalex.org/works/{openalex_work_id}"
-    openalex_data = _fetch_json(openalex_url, source="OpenAlex", params=_openalex_params(), quiet_statuses={404})
-    if openalex_data:
-        openalex_candidate = _openalex_item_to_candidate(openalex_data)
-        if openalex_candidate:
-            candidates.append(openalex_candidate)
+    openalex_candidate = _get_candidate_from_openalex_doi(doi)
+    if openalex_candidate:
+        candidates.append(openalex_candidate)
 
     if not candidates:
         return canonical_candidate({

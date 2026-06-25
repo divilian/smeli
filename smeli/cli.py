@@ -23,10 +23,10 @@ from .candidates import canonical_candidate
 from .normalize import clean_doi, extract_arxiv_id, extract_orcid, _get_year_from_date
 from .config import _MAX_DISPLAY_CANDIDATES
 from .sources import (
-    get_best_structured_metadata,
+    get_metadata,
     get_bibtex_from_doi,
     get_candidate_from_doi,
-    get_orcids_from_openalex,
+    get_orcids,
     get_paper_candidates,
 )
 
@@ -217,7 +217,7 @@ def _print_selected_paper_details(
 
     if doi:
         print("\n--- Structured DOI metadata ---")
-        metadata = get_best_structured_metadata(doi)
+        metadata = get_metadata(doi)
         if metadata is None:
             print(
                 "No Crossref or DataCite metadata found. This may still be a "
@@ -228,12 +228,13 @@ def _print_selected_paper_details(
             _print_dict(metadata)
         input("(Press Enter.)")
 
-        print("\n--- ORCIDs from OpenAlex ---")
-        orcids = get_orcids_from_openalex(doi)
+        print("\n--- ORCIDs from metadata sources ---")
+        orcids = get_orcids(doi)
         if not orcids:
             print("[]")
         else:
-            _print_list_of_dicts(orcids)
+            for orcid in orcids:
+                print(f"  - {orcid}")
         input("(Press Enter.)")
 
         print("\n--- BibTeX from doi.org ---")

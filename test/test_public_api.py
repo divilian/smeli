@@ -47,6 +47,10 @@ def test_non_private_module_definitions_are_exported():
 
 def test_top_level_all_exposes_package_api_without_private_helpers():
     assert "get_paper_candidates" in smeli.__all__
+    assert "get_metadata" in smeli.__all__
+    assert "get_orcids" in smeli.__all__
+    assert "get_best_structured_metadata" not in smeli.__all__
+    assert not hasattr(smeli, "get_best_structured_metadata")
     assert "clean_doi" in smeli.__all__
     assert "candidate_to_bibtex" in smeli.__all__
     assert "main" in smeli.__all__

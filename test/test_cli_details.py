@@ -13,8 +13,8 @@ def test_doi_work_uses_doi_org_bibtex_without_generated_fallback(monkeypatch, ca
     }
 
     monkeypatch.setattr(builtins, "input", lambda prompt="": "")
-    monkeypatch.setattr(cli, "get_best_structured_metadata", lambda doi: {"source": "Crossref", "doi": doi})
-    monkeypatch.setattr(cli, "get_orcids_from_openalex", lambda doi: [])
+    monkeypatch.setattr(cli, "get_metadata", lambda doi: {"source": "Crossref", "doi": doi})
+    monkeypatch.setattr(cli, "get_orcids", lambda doi: [])
     monkeypatch.setattr(
         cli,
         "get_bibtex_from_doi",
@@ -41,8 +41,8 @@ def test_doi_work_generates_bibtex_when_doi_org_has_no_bibtex(monkeypatch, capsy
     }
 
     monkeypatch.setattr(builtins, "input", lambda prompt="": "")
-    monkeypatch.setattr(cli, "get_best_structured_metadata", lambda doi: {"source": "Crossref", "doi": doi})
-    monkeypatch.setattr(cli, "get_orcids_from_openalex", lambda doi: [])
+    monkeypatch.setattr(cli, "get_metadata", lambda doi: {"source": "Crossref", "doi": doi})
+    monkeypatch.setattr(cli, "get_orcids", lambda doi: [])
     monkeypatch.setattr(cli, "get_bibtex_from_doi", lambda doi: None)
 
     cli._print_selected_paper_details(candidate, pause_at_end=False)
