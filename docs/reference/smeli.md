@@ -1,7 +1,5 @@
 # `smeli`
 
-Top-level re-export of Smeli's public package API.
-
 ::: smeli
     options:
       show_root_heading: false

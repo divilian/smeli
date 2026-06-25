@@ -38,3 +38,9 @@ def test_orcid_helpers_accept_bare_prefixed_and_url_forms():
     assert smeli.looks_like_orcid("https://orcid.org/0000-0002-0254-6627")
     assert smeli.orcid_url("0000-0002-0254-6627") == "https://orcid.org/0000-0002-0254-6627"
     assert not smeli.looks_like_orcid("not an orcid")
+
+
+def test_extract_orcid_accepts_candidate_records():
+    assert smeli.extract_orcid({"orcid": "https://orcid.org/0000-0002-0254-6627"}) == "0000-0002-0254-6627"
+    assert smeli.extract_orcid({"authors": [{"name": "Ada"}, {"ORCID": "0000-0002-0254-662x"}]}) == "0000-0002-0254-662X"
+    assert smeli.extract_orcid({"authors": [{"name": "Ada"}]}) is None

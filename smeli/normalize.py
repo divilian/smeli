@@ -84,11 +84,12 @@ Returns:
 
 _ORCID_RE = re.compile(r"\b\d{4}-\d{4}-\d{4}-\d{3}[0-9X]\b", re.IGNORECASE)
 
-def extract_orcid(value: str | None) -> str | None:
-    """Extract and normalize a bare ORCID iD from text or URL.
+def extract_orcid(value: Any | None) -> str | None:
+    """Extract and normalize a bare ORCID iD from text, URL, or record.
 
 Args:
-    value: Text that may contain a bare ORCID iD or an ``orcid.org`` URL.
+    value: Text that may contain a bare ORCID iD or an ``orcid.org`` URL, or a
+        nested candidate/source record that may contain an ORCID value.
 
 Returns:
     The normalized bare ORCID iD, such as ``"0000-0002-0254-6627"``, or
@@ -97,14 +98,29 @@ Returns:
     if not value:
         return None
 
-    text = value.strip()
-    match = _ORCID_RE.search(text)
-    if not match:
+    if isinstance(value, str):
+        match = _ORCID_RE.search(value.strip())
+        if not match:
+            return None
+
+        # ORCID check digits may be X; canonicalize that final character.
+        orcid = match.group(0)
+        return orcid[:-1] + orcid[-1].upper()
+
+    if isinstance(value, dict):
+        for item in value.values():
+            orcid = extract_orcid(item)
+            if orcid:
+                return orcid
         return None
 
-    # ORCID check digits may be X; canonicalize that final character.
-    orcid = match.group(0)
-    return orcid[:-1] + orcid[-1].upper()
+    if isinstance(value, (list, tuple, set)):
+        for item in value:
+            orcid = extract_orcid(item)
+            if orcid:
+                return orcid
+
+    return None
 
 def looks_like_orcid(value: str | None) -> bool:
     """Return whether text contains an ORCID iD or ORCID URL.
