@@ -1,4 +1,10 @@
-"""Command-line interface for smeli."""
+"""Command-line interface for Smeli.
+
+The library-facing public API of this module is intentionally tiny:
+:func:`main` is the console-script entrypoint used by the ``smeli`` command.
+Display helpers, prompts, color constants, and one-shot argument handling are
+private implementation details.
+"""
 from __future__ import annotations
 
 __all__ = [
@@ -438,7 +444,21 @@ def _run_one_shot(args: list[str]) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Run the scholarly metadata lookup CLI."""
+    """Run the scholarly metadata lookup CLI.
+
+Args:
+    argv: Optional command-line arguments excluding the program name. When
+        ``None``, arguments are read from ``sys.argv``.
+
+Returns:
+    ``None``. Results are printed to standard output and interactive prompts
+    read from standard input.
+
+Notes:
+    Normal package users should prefer the lookup functions in
+    :mod:`smeli.sources`. This function is public primarily because it is the
+    console-script target for the ``smeli`` command.
+"""
     if argv is None:
         argv = sys.argv[1:]
 

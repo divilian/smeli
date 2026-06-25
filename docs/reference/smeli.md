@@ -1,0 +1,46 @@
+# `smeli`
+
+Top-level re-export of Smeli's public package API.
+
+::: smeli
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+      members:
+        - clean_doi
+        - looks_like_doi
+        - extract_orcid
+        - looks_like_orcid
+        - orcid_url
+        - extract_arxiv_id
+        - base_arxiv_id
+        - make_arxiv_url
+        - canonical_candidate
+        - candidate_score
+        - candidates_are_same
+        - merge_candidates
+        - merge_candidate_list
+        - bibliographic_query
+        - get_metadata_from_crossref
+        - get_metadata_from_datacite
+        - get_best_structured_metadata
+        - get_bibtex_from_doi
+        - get_orcids_from_openalex
+        - get_orcids_from_crossref
+        - get_work_candidates_from_crossref
+        - get_work_candidates_from_openalex
+        - get_work_candidates_from_datacite
+        - get_work_candidates_from_arxiv
+        - get_candidate_from_openalex_id
+        - get_candidate_from_arxiv_id
+        - get_candidate_from_doi
+        - get_work_candidates_from_orcid
+        - get_work_candidates_from_identifier
+        - get_work_candidates
+        - get_doi_from_crossref
+        - get_doi_from_openalex
+        - parse_bibtex_entry
+        - print_bibtex
+        - make_cite_key
+        - candidate_to_bibtex
+        - main

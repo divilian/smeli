@@ -1,0 +1,50 @@
+site_name: Smeli
+site_description: Scholarly MEtadata Lookup Interface API documentation
+repo_url: https://github.com/divilian/smeli
+repo_name: divilian/smeli
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.expand
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: false
+            show_signature_annotations: true
+            separate_signature: true
+            members_order: source
+            filters:
+              - "!^_"
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - API Overview: api.md
+  - Candidate Records: candidate-records.md
+  - Examples: examples.md
+  - Reference:
+      - smeli: reference/smeli.md
+      - smeli.normalize: reference/normalize.md
+      - smeli.candidates: reference/candidates.md
+      - smeli.sources: reference/sources.md
+      - smeli.bibtex: reference/bibtex.md
+      - smeli.cli: reference/cli.md
+  - CLI: cli.md
+  - Development: development.md

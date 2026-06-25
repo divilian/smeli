@@ -15,6 +15,12 @@ smeli = "smeli.cli:main"
 test = [
     "pytest",
 ]
+docs = [
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocstrings[python]",
+    "ruff",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["test"]

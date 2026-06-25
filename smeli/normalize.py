@@ -1,4 +1,10 @@
-"""Normalization and identifier helpers for smeli."""
+"""Normalization and identifier helpers for Smeli.
+
+This module contains small, side-effect-free helpers for recognizing and
+normalizing scholarly identifiers. Public functions accept messy user input
+where practical: bare identifiers, resolver URLs, common prefixes, and leading
+or trailing whitespace.
+"""
 from __future__ import annotations
 
 __all__ = [
@@ -28,7 +34,19 @@ def _first(value: Any, default: str = "") -> Any:
     return default
 
 def clean_doi(value: str | None) -> str | None:
-    """Normalize common DOI representations to a bare DOI string."""
+    """Normalize common DOI representations to a bare DOI string.
+
+Args:
+    value: A DOI-like string, DOI URL, ``doi:``-prefixed value, or ``None``.
+
+Returns:
+    The normalized bare DOI, preserving DOI case where present, or ``None`` if
+    the input is empty or does not contain a valid-looking DOI.
+
+Examples:
+    ``clean_doi("https://doi.org/10.1126/science.1102081")`` returns
+    ``"10.1126/science.1102081"``.
+"""
     if not value:
         return None
 
@@ -53,14 +71,29 @@ def clean_doi(value: str | None) -> str | None:
     return doi
 
 def looks_like_doi(value: str | None) -> bool:
-    """Return True if text looks like a DOI or DOI URL."""
+    """Return whether text contains a valid-looking DOI.
+
+Args:
+    value: Text that may contain a bare DOI or DOI resolver URL.
+
+Returns:
+    ``True`` when :func:`clean_doi` can extract a DOI; otherwise ``False``.
+"""
     doi = clean_doi(value)
     return bool(doi and re.match(r"^10\.\S+/\S+$", doi, re.IGNORECASE))
 
 _ORCID_RE = re.compile(r"\b\d{4}-\d{4}-\d{4}-\d{3}[0-9X]\b", re.IGNORECASE)
 
 def extract_orcid(value: str | None) -> str | None:
-    """Extract and normalize a bare ORCID iD from text/URL, if present."""
+    """Extract and normalize a bare ORCID iD from text or URL.
+
+Args:
+    value: Text that may contain a bare ORCID iD or an ``orcid.org`` URL.
+
+Returns:
+    The normalized bare ORCID iD, such as ``"0000-0002-0254-6627"``, or
+    ``None`` when no ORCID-like identifier is present.
+"""
     if not value:
         return None
 
@@ -74,11 +107,27 @@ def extract_orcid(value: str | None) -> str | None:
     return orcid[:-1] + orcid[-1].upper()
 
 def looks_like_orcid(value: str | None) -> bool:
-    """Return True if text contains an ORCID iD or ORCID URL."""
+    """Return whether text contains an ORCID iD or ORCID URL.
+
+Args:
+    value: Text that may contain an ORCID identifier.
+
+Returns:
+    ``True`` when :func:`extract_orcid` can extract an ORCID iD; otherwise
+    ``False``.
+"""
     return extract_orcid(value) is not None
 
 def orcid_url(orcid: str | None) -> str | None:
-    """Return the canonical ORCID URL for an ORCID iD-like value."""
+    """Return the canonical ORCID URL for an ORCID-like value.
+
+Args:
+    orcid: A bare ORCID iD, ORCID URL, or other ORCID-like text.
+
+Returns:
+    A canonical URL such as ``"https://orcid.org/0000-0002-0254-6627"``, or
+    ``None`` if the input does not contain an ORCID iD.
+"""
     bare = extract_orcid(orcid)
     if not bare:
         return None
@@ -187,7 +236,16 @@ def _get_year_from_date(value: str | None) -> int | None:
     return int(match.group(1))
 
 def extract_arxiv_id(value: str | None) -> str | None:
-    """Extract a modern or old-style arXiv ID from text/URL, if present."""
+    """Extract a modern or old-style arXiv ID from text or URL.
+
+Args:
+    value: Text that may contain a bare arXiv ID, ``arXiv:``-prefixed ID, or an
+        arXiv abstract/PDF URL.
+
+Returns:
+    The arXiv ID as written, including a version suffix when present, or
+    ``None`` when no arXiv identifier is present.
+"""
     if not value:
         return None
 
@@ -221,7 +279,15 @@ def extract_arxiv_id(value: str | None) -> str | None:
     return None
 
 def base_arxiv_id(arxiv_id: str | None) -> str | None:
-    """Strip an arXiv version suffix for deduplication."""
+    """Strip an arXiv version suffix for deduplication.
+
+Args:
+    arxiv_id: An arXiv identifier such as ``"2501.01234v2"``.
+
+Returns:
+    The identifier without its trailing version suffix, such as
+    ``"2501.01234"``, or ``None`` for empty input.
+"""
     if not arxiv_id:
         return None
     return re.sub(r"v\d+$", "", arxiv_id.strip(), flags=re.IGNORECASE)
@@ -250,7 +316,16 @@ def _find_arxiv_id_in_mapping(mapping: dict[str, Any]) -> str | None:
     return None
 
 def make_arxiv_url(arxiv_id: str | None) -> str:
-    """Return the canonical arXiv abstract URL for an ID."""
+    """Return the canonical arXiv abstract URL for an ID.
+
+Args:
+    arxiv_id: A bare arXiv identifier, optionally with an ``arXiv:`` prefix,
+        URL wrapper, or version suffix.
+
+Returns:
+    The canonical abstract URL. Empty or unparseable input produces the empty
+    string.
+"""
     return f"https://arxiv.org/abs/{arxiv_id}" if arxiv_id else ""
 
 def _maybe_int(value: Any) -> int | None:

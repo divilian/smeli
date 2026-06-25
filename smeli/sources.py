@@ -1,4 +1,13 @@
-"""Metadata source lookups and cross-source orchestration."""
+"""Metadata source lookups and cross-source orchestration.
+
+This module is the main networked public API for Smeli. It queries OpenAlex,
+Crossref, DataCite, arXiv, and doi.org, then returns either structured metadata
+dictionaries, ORCID lists, BibTeX strings, or Smeli candidate dictionaries.
+
+Functions return ``None`` or an empty list when no useful result is found.
+Expected misses are handled quietly where practical; real network and parsing
+errors may print short diagnostic messages.
+"""
 from __future__ import annotations
 
 __all__ = [
@@ -64,11 +73,19 @@ from .candidates import (
 
 
 def get_metadata_from_crossref(doi: str) -> dict[str, Any] | None:
-    """
-    Fetch structured metadata for a DOI from Crossref.
+    """Fetch structured metadata for a DOI from Crossref.
 
-    Important: this is a Crossref-specific lookup. It can fail for perfectly
-    valid DOIs that are registered with another DOI registration agency.
+    Args:
+        doi: A bare DOI, DOI URL, or DOI-like string.
+
+    Returns:
+        A metadata dictionary with keys such as ``source``, ``doi``, ``title``,
+        ``authors``, ``journal``, ``publisher``, ``citations``, ``year``,
+        ``type``, and ``url``; or ``None`` if Crossref has no usable record.
+
+    Notes:
+        This is a Crossref-specific lookup. It can fail for valid DOIs
+        registered with another DOI registration agency.
     """
     doi = clean_doi(doi)
     if not doi:
@@ -98,12 +115,19 @@ def get_metadata_from_crossref(doi: str) -> dict[str, Any] | None:
     }
 
 def get_metadata_from_datacite(doi: str) -> dict[str, Any] | None:
-    """
-    Fetch structured metadata for a DOI from DataCite.
+    """Fetch structured metadata for a DOI from DataCite.
 
-    DataCite is a separate DOI registration agency from Crossref. This lookup is
-    useful when a DOI is valid but Crossref does not have a metadata record for
-    it, which is common for datasets, software, preprints, and repository items.
+    Args:
+        doi: A bare DOI, DOI URL, or DOI-like string.
+
+    Returns:
+        A metadata dictionary with keys such as ``source``, ``doi``, ``title``,
+        ``authors``, ``journal``, ``publisher``, ``citations``, ``year``,
+        ``type``, and ``url``; or ``None`` if DataCite has no usable record.
+
+    Notes:
+        DataCite is a separate DOI registration agency from Crossref. It is
+        often useful for datasets, software, preprints, and repository items.
     """
     doi = clean_doi(doi)
     if not doi:
@@ -138,11 +162,18 @@ def get_metadata_from_datacite(doi: str) -> dict[str, Any] | None:
     }
 
 def get_best_structured_metadata(doi: str) -> dict[str, Any] | None:
-    """
-    Fetch structured DOI metadata, trying Crossref first and DataCite second.
+    """Fetch structured DOI metadata from the best available DOI source.
 
-    Crossref remains the preferred metadata source for journal/conference-style
-    publications. DataCite is tried only when Crossref has no usable record.
+    Args:
+        doi: A bare DOI, DOI URL, or DOI-like string.
+
+    Returns:
+        A Crossref metadata dictionary when Crossref has a usable record;
+        otherwise a DataCite metadata dictionary; otherwise ``None``.
+
+    Notes:
+        Crossref is tried first because it is usually best for article and
+        conference metadata. DataCite is used as the fallback.
     """
     metadata = get_metadata_from_crossref(doi)
     if metadata is not None:
@@ -152,11 +183,18 @@ def get_best_structured_metadata(doi: str) -> dict[str, Any] | None:
     return get_metadata_from_datacite(doi)
 
 def get_bibtex_from_doi(doi: str) -> str | None:
-    """
-    Retrieve BibTeX formatting from doi.org via content negotiation.
+    """Retrieve BibTeX from doi.org content negotiation.
 
-    This can work beyond Crossref DOIs, because the request goes through the DOI
-    resolver rather than directly to Crossref.
+    Args:
+        doi: A bare DOI, DOI URL, or DOI-like string.
+
+    Returns:
+        A raw BibTeX string from the DOI resolver, or ``None`` when no BibTeX is
+        returned.
+
+    Notes:
+        This goes through the DOI resolver rather than Crossref directly, so it
+        may work for DOIs outside Crossref's registry.
     """
     doi = clean_doi(doi)
     if not doi:
@@ -167,7 +205,15 @@ def get_bibtex_from_doi(doi: str) -> str | None:
     return _fetch_text(url, source="doi.org BibTeX", headers=headers)
 
 def get_orcids_from_openalex(doi: str) -> list[dict[str, str]]:
-    """Extract author ORCIDs using OpenAlex."""
+    """Extract author ORCIDs for a DOI using OpenAlex.
+
+Args:
+    doi: A bare DOI, DOI URL, or DOI-like string.
+
+Returns:
+    A list of dictionaries with ``name`` and ``orcid`` keys. Returns an empty
+    list when OpenAlex has no ORCID data for the work.
+"""
     doi = clean_doi(doi)
     if not doi:
         return []
@@ -193,11 +239,17 @@ def get_orcids_from_openalex(doi: str) -> list[dict[str, str]]:
     return orcids
 
 def get_orcids_from_crossref(doi: str) -> list[dict[str, str]]:
-    """
-    Extract author ORCIDs from Crossref metadata, if provided by the publisher.
+    """Extract author ORCIDs from Crossref metadata.
 
-    This function is currently unused by the CLI, but is kept as a useful
-    comparison with OpenAlex ORCID coverage.
+    Args:
+        doi: A bare DOI, DOI URL, or DOI-like string.
+
+    Returns:
+        A list of dictionaries with ``name`` and ``orcid`` keys. Returns an
+        empty list when Crossref has no ORCID data for the work.
+
+    Notes:
+        Crossref ORCID coverage depends on what the publisher supplied.
     """
     doi = clean_doi(doi)
     if not doi:
@@ -224,7 +276,17 @@ def get_work_candidates_from_crossref(
     title: str | None = None,
     year: str | int | None = None,
 ) -> list[dict[str, Any]]:
-    """Fetch work candidates from Crossref bibliographic search."""
+    """Fetch work candidates from Crossref bibliographic search.
+
+Args:
+    author: Optional author name or fragment.
+    title: Optional title or title fragment.
+    year: Optional publication year.
+
+Returns:
+    A list of Smeli candidate dictionaries from Crossref that pass local
+    matching.
+"""
     url = "https://api.crossref.org/works"
 
     params: dict[str, Any] = {
@@ -260,11 +322,19 @@ def get_work_candidates_from_openalex(
     title: str | None = None,
     year: str | int | None = None,
 ) -> list[dict[str, Any]]:
-    """
-    Fetch work candidates from OpenAlex matching the provided criteria.
+    """Fetch work candidates from OpenAlex.
 
-    Unlike the earlier DOI-only version, this function deliberately keeps
-    DOI-less OpenAlex works.
+    Args:
+        author: Optional author name or fragment.
+        title: Optional title or title fragment.
+        year: Optional publication year.
+
+    Returns:
+        A list of Smeli candidate dictionaries from OpenAlex that pass local
+        matching.
+
+    Notes:
+        DOI-less OpenAlex works are deliberately retained.
     """
     url = "https://api.openalex.org/works"
 
@@ -311,7 +381,17 @@ def get_work_candidates_from_datacite(
     title: str | None = None,
     year: str | int | None = None,
 ) -> list[dict[str, Any]]:
-    """Fetch work candidates from DataCite DOI metadata search."""
+    """Fetch work candidates from DataCite metadata search.
+
+Args:
+    author: Optional author name or fragment.
+    title: Optional title or title fragment.
+    year: Optional publication year.
+
+Returns:
+    A list of Smeli candidate dictionaries from DataCite that pass local
+    matching.
+"""
     url = "https://api.datacite.org/dois"
     query = bibliographic_query(author, title, year)
     if not query:
@@ -360,7 +440,16 @@ def get_work_candidates_from_arxiv(
     title: str | None = None,
     year: str | int | None = None,
 ) -> list[dict[str, Any]]:
-    """Fetch work candidates from the arXiv Atom API."""
+    """Fetch work candidates from the arXiv Atom API.
+
+Args:
+    author: Optional author name or fragment.
+    title: Optional title or title fragment.
+    year: Optional publication year used for local filtering.
+
+Returns:
+    A list of Smeli candidate dictionaries from arXiv that pass local matching.
+"""
     if not title and not author:
         return []
 
@@ -396,7 +485,16 @@ def get_work_candidates_from_arxiv(
     return matched
 
 def get_candidate_from_openalex_id(openalex_id: str) -> dict[str, Any] | None:
-    """Fetch a single candidate by OpenAlex work ID or URL."""
+    """Fetch a single candidate by OpenAlex work ID or URL.
+
+Args:
+    openalex_id: An OpenAlex work ID such as ``"W2741809807"`` or a full
+        ``openalex.org`` work URL.
+
+Returns:
+    A Smeli candidate dictionary, or ``None`` when the work cannot be fetched or
+    converted.
+"""
     value = openalex_id.strip()
     if not value:
         return None
@@ -414,7 +512,14 @@ def get_candidate_from_openalex_id(openalex_id: str) -> dict[str, Any] | None:
     return _openalex_item_to_candidate(data)
 
 def get_candidate_from_arxiv_id(arxiv_id: str) -> dict[str, Any] | None:
-    """Fetch a single candidate by arXiv ID."""
+    """Fetch a single candidate by arXiv ID.
+
+Args:
+    arxiv_id: A bare arXiv ID, ``arXiv:``-prefixed ID, or arXiv URL.
+
+Returns:
+    A Smeli candidate dictionary, or ``None`` when arXiv has no matching entry.
+"""
     arxiv_id = base_arxiv_id(extract_arxiv_id(arxiv_id) or arxiv_id)
     if not arxiv_id:
         return None
@@ -439,7 +544,16 @@ def get_candidate_from_arxiv_id(arxiv_id: str) -> dict[str, Any] | None:
     return _arxiv_entry_to_candidate(entry)
 
 def get_candidate_from_doi(doi: str) -> dict[str, Any] | None:
-    """Build a single candidate around a known DOI, enriched where possible."""
+    """Build a single candidate around a known DOI.
+
+Args:
+    doi: A bare DOI, DOI URL, or DOI-like string.
+
+Returns:
+    A merged Smeli candidate dictionary enriched from Crossref, DataCite, and
+    OpenAlex where available. If no external metadata is found for a valid DOI,
+    returns a minimal DOI-only candidate.
+"""
     doi = clean_doi(doi)
     if not doi:
         return None
@@ -654,7 +768,20 @@ def _get_work_candidates_from_arxiv_loose(
     return matched
 
 def get_work_candidates_from_orcid(orcid: str) -> list[dict[str, Any]]:
-    """Fetch work candidates for an author ORCID using OpenAlex."""
+    """Fetch work candidates for an author ORCID using OpenAlex.
+
+Args:
+    orcid: A bare ORCID iD or ORCID URL.
+
+Returns:
+    A list of Smeli candidate dictionaries, sorted by OpenAlex publication date
+    descending before later Smeli ranking/merging.
+
+Notes:
+    ORCID identifies a person, not a work, so this function returns a list of
+    works. OpenAlex may return no works for a valid ORCID when its author-work
+    links lack that ORCID.
+"""
     bare_orcid = extract_orcid(orcid)
     if not bare_orcid:
         return []
@@ -686,7 +813,16 @@ def get_work_candidates_from_orcid(orcid: str) -> list[dict[str, Any]]:
     return matched
 
 def get_work_candidates_from_identifier(identifier: str) -> list[dict[str, Any]]:
-    """Resolve a DOI, arXiv ID/URL, ORCID, or OpenAlex work ID/URL."""
+    """Resolve a DOI, arXiv ID/URL, ORCID, or OpenAlex work ID/URL.
+
+Args:
+    identifier: A scholarly identifier or resolver URL.
+
+Returns:
+    A list of Smeli candidate dictionaries. Work identifiers usually return
+    zero or one candidate. ORCID identifiers may return many candidates because
+    they identify an author/person rather than a work.
+"""
     identifier = identifier.strip()
     if not identifier:
         return []
@@ -717,7 +853,26 @@ def get_work_candidates(
     identifier: str | None = None,
     query: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Search all configured metadata sources and return merged work candidates."""
+    """Search all configured metadata sources and return merged candidates.
+
+Args:
+    author: Optional author name or fragment for fielded search.
+    title: Optional title or title fragment for fielded search.
+    year: Optional publication year for filtering/scoring.
+    identifier: Optional DOI, arXiv ID/URL, ORCID, or OpenAlex work ID/URL. When
+        supplied, identifier resolution takes precedence over fielded search.
+    query: Optional free-form bibliographic query. Used when no identifier is
+        supplied.
+
+Returns:
+    A score-sorted list of merged Smeli candidate dictionaries. Duplicate work
+    records from multiple sources are collapsed and annotated with
+    ``metadata_sources``.
+
+Notes:
+    This is the highest-level public lookup API. It may print progress messages
+    while it queries sources.
+"""
     search_variants: list[dict[str, Any]] = [
         {"author": author, "title": title or query, "year": year},
     ]
@@ -804,7 +959,21 @@ def get_doi_from_crossref(
     title: str | None = None,
     year: str | int | None = None,
 ) -> list[dict[str, Any]]:
-    """Return Crossref candidates that have DOIs."""
+    """Return Crossref work candidates that have DOIs.
+
+Args:
+    author: Optional author name or fragment.
+    title: Optional title or title fragment.
+    year: Optional publication year.
+
+Returns:
+    Crossref candidate dictionaries filtered to records with a DOI.
+
+Notes:
+    This is a compatibility/convenience helper from Smeli's DOI-focused origins.
+    New code usually wants :func:`get_work_candidates_from_crossref` or
+    :func:`get_work_candidates` instead.
+"""
     return [
         candidate
         for candidate in get_work_candidates_from_crossref(author=author, title=title, year=year)
@@ -816,7 +985,21 @@ def get_doi_from_openalex(
     title: str | None = None,
     year: str | int | None = None,
 ) -> list[dict[str, Any]]:
-    """Return OpenAlex candidates that have DOIs."""
+    """Return OpenAlex work candidates that have DOIs.
+
+Args:
+    author: Optional author name or fragment.
+    title: Optional title or title fragment.
+    year: Optional publication year.
+
+Returns:
+    OpenAlex candidate dictionaries filtered to records with a DOI.
+
+Notes:
+    This is a compatibility/convenience helper from Smeli's DOI-focused origins.
+    New code usually wants :func:`get_work_candidates_from_openalex` or
+    :func:`get_work_candidates` instead.
+"""
     return [
         candidate
         for candidate in get_work_candidates_from_openalex(author=author, title=title, year=year)

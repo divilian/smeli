@@ -1,4 +1,14 @@
-"""Candidate conversion, matching, scoring, and merging."""
+"""Candidate conversion, scoring, and merging helpers.
+
+A *candidate* is Smeli's normal work-record dictionary. It may represent a
+journal article, conference paper, arXiv preprint, dataset, software record, or
+other scholarly work. Common keys include ``title``, ``authors``, ``year``,
+``venue``, ``publisher``, ``doi``, ``arxiv_id``, ``openalex_id``, ``url``,
+``cited_by_count``, ``metadata_sources``, ``score``, and ``citation_score``.
+
+The public functions in this module are pure local helpers: they do not perform
+network requests.
+"""
 from __future__ import annotations
 
 __all__ = [
@@ -80,7 +90,20 @@ def _get_type_from_datacite(attributes: dict[str, Any]) -> str:
     return types.get("resourceType") or types.get("resourceTypeGeneral") or ""
 
 def canonical_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
-    """Ensure optional candidate fields exist and normalize identifiers."""
+    """Return a normalized copy of a candidate dictionary.
+
+Args:
+    candidate: A partial Smeli candidate record. Missing optional fields are
+        allowed.
+
+Returns:
+    A new dictionary with normalized DOI/arXiv identifiers, default values for
+    common optional fields, a ``metadata_sources`` list, and a best-effort
+    landing ``url`` when an identifier is available.
+
+Notes:
+    The input dictionary is copied before modification.
+"""
     candidate = dict(candidate)
     candidate["doi"] = clean_doi(candidate.get("doi"))
     candidate["arxiv_id"] = base_arxiv_id(candidate.get("arxiv_id") or extract_arxiv_id(candidate.get("url")))
@@ -333,11 +356,22 @@ def candidate_score(
     title: str | None = None,
     year: str | int | None = None,
 ) -> tuple[int, int]:
-    """
-    Return a simple ranking score for a work candidate.
+    """Return a local relevance score for a work candidate.
 
-    The score is a local approximation of relevance. Matching decides whether to
-    include a candidate; scoring decides which plausible candidates come first.
+    Args:
+        candidate: A Smeli candidate dictionary.
+        author: Optional author name or fragment supplied by the user.
+        title: Optional title or title fragment supplied by the user.
+        year: Optional publication year supplied by the user.
+
+    Returns:
+        A ``(score, citation_bonus)`` tuple. ``score`` reflects local
+        bibliographic relevance; ``citation_bonus`` is a weak tie-breaker
+        derived from citation count.
+
+    Notes:
+        The score is intentionally heuristic. It is useful for ranking plausible
+        candidates, not for measuring scholarly relevance in an academic sense.
     """
     score = 0
 
@@ -466,7 +500,16 @@ def _add_best_candidate_score(
     return candidate
 
 def candidates_are_same(a: dict[str, Any], b: dict[str, Any]) -> bool:
-    """Return True if two candidates appear to describe the same work."""
+    """Return whether two candidates appear to describe the same work.
+
+Args:
+    a: First Smeli candidate dictionary.
+    b: Second Smeli candidate dictionary.
+
+Returns:
+    ``True`` if the candidates share a DOI, arXiv ID, OpenAlex ID, or have a
+    strong title/year/author match; otherwise ``False``.
+"""
     doi_a = clean_doi(a.get("doi"))
     doi_b = clean_doi(b.get("doi"))
     if doi_a and doi_b and doi_a.casefold() == doi_b.casefold():
@@ -499,7 +542,20 @@ def candidates_are_same(a: dict[str, Any], b: dict[str, Any]) -> bool:
     return True
 
 def merge_candidates(primary: dict[str, Any], secondary: dict[str, Any]) -> dict[str, Any]:
-    """Merge two candidates that appear to be the same work."""
+    """Merge two candidate dictionaries describing the same work.
+
+Args:
+    primary: The preferred candidate record. Existing values are generally kept.
+    secondary: A second candidate record used to fill gaps and add sources.
+
+Returns:
+    A canonicalized candidate dictionary containing the best available fields
+    from both inputs.
+
+Notes:
+    This function does not first verify that the records match. Call
+    :func:`candidates_are_same` before merging untrusted pairs.
+"""
     merged = dict(primary)
 
     # Prefer existing values, but fill blanks from the secondary record.
@@ -553,7 +609,15 @@ def merge_candidates(primary: dict[str, Any], secondary: dict[str, Any]) -> dict
     return canonical_candidate(merged)
 
 def merge_candidate_list(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Merge candidates from multiple metadata sources."""
+    """Merge a list of candidate dictionaries across metadata sources.
+
+Args:
+    candidates: Candidate records from one or more source APIs.
+
+Returns:
+    A list of canonicalized candidate records with likely duplicates collapsed
+    using :func:`candidates_are_same` and :func:`merge_candidates`.
+"""
     merged: list[dict[str, Any]] = []
 
     for candidate in candidates:
@@ -572,7 +636,17 @@ def merge_candidate_list(candidates: list[dict[str, Any]]) -> list[dict[str, Any
     return merged
 
 def bibliographic_query(author: str | None, title: str | None, year: str | int | None) -> str:
-    """Build a compact bibliographic query string from available fields."""
+    """Build a compact bibliographic query string from available fields.
+
+Args:
+    author: Optional author name or fragment.
+    title: Optional title or title fragment.
+    year: Optional publication year.
+
+Returns:
+    A single space-separated query string containing non-empty fields in
+    title-author-year order.
+"""
     parts = []
     if title:
         parts.append(str(title).strip())

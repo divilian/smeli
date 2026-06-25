@@ -22,6 +22,17 @@ smeli still building the memex davies
 
 Identifier and free-form lookups go straight to work details when exactly one work is found. ORCID lookups usually return an author's ranked work list.
 
+## API documentation
+
+The public Python API is documented in `docs/` and can be served locally with MkDocs:
+
+```bash
+pip install -e '.[docs]'
+mkdocs serve
+```
+
+The public API surface is defined by each module's `__all__` list.
+
 ## Tests
 
 ```bash

@@ -1,4 +1,9 @@
-"""BibTeX parsing, pretty-printing, and generation."""
+"""BibTeX parsing, pretty-printing, and generation.
+
+Smeli prefers doi.org-provided BibTeX when it is available for a DOI. These
+helpers support parsing and displaying that BibTeX, and generating a
+conservative fallback BibTeX-like entry from Smeli candidate metadata.
+"""
 from __future__ import annotations
 
 __all__ = [
@@ -75,10 +80,18 @@ def _clean_bibtex_value(value: str) -> str:
     return value
 
 def parse_bibtex_entry(bibtex: str) -> dict[str, Any] | None:
-    """
-    Parse a single BibTeX entry into a simple dictionary.
+    """Parse a single BibTeX entry into a simple dictionary.
 
-    Returns None if the entry does not look like a normal single BibTeX entry.
+    Args:
+        bibtex: Text containing one BibTeX entry.
+
+    Returns:
+        A dictionary with ``entry_type``, ``cite_key``, and ``fields`` keys, or
+        ``None`` if the text does not look like a normal single BibTeX entry.
+
+    Notes:
+        This parser is intentionally small. It handles ordinary BibTeX returned
+        by DOI content negotiation, but it is not a full BibTeX parser.
     """
     text = bibtex.strip()
 
@@ -107,11 +120,17 @@ def parse_bibtex_entry(bibtex: str) -> dict[str, Any] | None:
     }
 
 def print_bibtex(bibtex: str) -> None:
-    """
-    Print a BibTeX entry in a friendlier field-by-field format.
+    """Print a BibTeX entry in a friendlier field-by-field format.
 
-    Also prints the raw BibTeX afterward so the user can copy/paste it into
-    BibTeX-aware tools.
+    Args:
+        bibtex: Text containing one BibTeX entry.
+
+    Returns:
+        ``None``. Output is written to standard output.
+
+    Notes:
+        The raw BibTeX is printed after the field-by-field display so it can
+        still be copied into BibTeX-aware tools.
     """
     parsed = parse_bibtex_entry(bibtex)
 
@@ -167,7 +186,16 @@ def _bibtex_escape(value: Any) -> str:
     return text
 
 def make_cite_key(candidate: dict[str, Any]) -> str:
-    """Create a compact citation key from first-author surname and year."""
+    """Create a compact citation key from first-author surname and year.
+
+Args:
+    candidate: A Smeli candidate dictionary.
+
+Returns:
+    A lower-case key in Kurrent/Smeli style, such as ``"davies2011"`` or
+    ``"starnini2025"``. Missing authors fall back to ``"work"`` and missing
+    years fall back to ``"nd"``.
+"""
     authors = candidate.get("authors") or []
     if authors:
         author_part = _author_lastish_name(authors[0]) or "work"
@@ -179,7 +207,20 @@ def make_cite_key(candidate: dict[str, Any]) -> str:
     return re.sub(r"[^a-z0-9_:-]", "", key)
 
 def candidate_to_bibtex(candidate: dict[str, Any]) -> str:
-    """Generate a conservative BibTeX-like entry from available candidate metadata."""
+    """Generate a conservative BibTeX-like entry from candidate metadata.
+
+Args:
+    candidate: A Smeli candidate dictionary.
+
+Returns:
+    A BibTeX-like string using available fields such as title, authors, year,
+    venue, DOI, arXiv ID, and URL.
+
+Notes:
+    This is a fallback formatter, not a replacement for publisher- or
+    resolver-provided BibTeX. Prefer :func:`smeli.sources.get_bibtex_from_doi`
+    when a DOI is available and doi.org content negotiation succeeds.
+"""
     entry_type = "article"
     if candidate.get("arxiv_id") and not candidate.get("doi"):
         entry_type = "misc"
