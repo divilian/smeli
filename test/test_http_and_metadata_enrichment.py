@@ -135,3 +135,55 @@ def test_get_metadata_from_datacite_silences_404(monkeypatch, capsys):
     assert smeli.get_metadata_from_datacite("10.1145/1897816.1897840") is None
     assert captured["kwargs"]["quiet_statuses"] == {404}
     assert capsys.readouterr().out == ""
+
+
+def test_get_metadata_from_crossref_silences_404(monkeypatch, capsys):
+    captured = {}
+
+    def fake_fetch_json(url, *, source="request", **kwargs):
+        captured["kwargs"] = kwargs
+        return None
+
+    monkeypatch.setattr(smeli.sources, "_fetch_json", fake_fetch_json)
+
+    assert smeli.get_metadata_from_crossref("10.5281/zenodo.2647458") is None
+    assert captured["kwargs"]["quiet_statuses"] == {404}
+    assert capsys.readouterr().out == ""
+
+
+def test_get_best_structured_metadata_fallback_is_quiet(monkeypatch, capsys):
+    monkeypatch.setattr(smeli.sources, "get_metadata_from_crossref", lambda value: None)
+    monkeypatch.setattr(smeli.sources, "get_metadata_from_datacite", lambda value: {"source": "DataCite", "doi": value})
+
+    metadata = smeli.get_best_structured_metadata("10.5281/zenodo.2647458")
+
+    assert metadata["source"] == "DataCite"
+    assert capsys.readouterr().out == ""
+
+
+def test_get_orcids_from_crossref_silences_404(monkeypatch, capsys):
+    captured = {}
+
+    def fake_fetch_json(url, *, source="request", **kwargs):
+        captured["kwargs"] = kwargs
+        return None
+
+    monkeypatch.setattr(smeli.sources, "_fetch_json", fake_fetch_json)
+
+    assert smeli.get_orcids_from_crossref("10.5281/zenodo.2647458") == []
+    assert captured["kwargs"]["quiet_statuses"] == {404}
+    assert capsys.readouterr().out == ""
+
+
+def test_get_orcids_from_openalex_silences_missing_work_404(monkeypatch, capsys):
+    captured = {}
+
+    def fake_fetch_json(url, *, source="request", **kwargs):
+        captured["kwargs"] = kwargs
+        return None
+
+    monkeypatch.setattr(smeli.sources, "_fetch_json", fake_fetch_json)
+
+    assert smeli.get_orcids_from_openalex("10.9999/not-in-openalex") == []
+    assert captured["kwargs"]["quiet_statuses"] == {404}
+    assert capsys.readouterr().out == ""
