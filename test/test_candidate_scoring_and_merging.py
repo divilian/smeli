@@ -74,3 +74,33 @@ def test_bibliographic_query_allows_omitted_fields():
     assert smeli.bibliographic_query(title="Attention Is All You Need") == "Attention Is All You Need"
     assert smeli.bibliographic_query(author="Vaswani", year=2017) == "Vaswani 2017"
     assert smeli.bibliographic_query() == ""
+
+
+def test_candidates_are_same_allows_one_year_preprint_proceedings_gap():
+    preprint = make_candidate(
+        doi="10.48550/arXiv.1810.04805",
+        arxiv_id="1810.04805",
+        openalex_id="",
+        title="BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+        authors=["Devlin, Jacob", "Chang, Ming-Wei"],
+        year=2018,
+        metadata_sources=["DataCite"],
+    )
+    proceedings = make_candidate(
+        doi="10.18653/v1/N19-1423",
+        arxiv_id="",
+        openalex_id="https://openalex.org/W2963341956",
+        title="BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+        authors=["Jacob Devlin", "Ming-Wei Chang"],
+        year=2019,
+        metadata_sources=["OpenAlex"],
+    )
+
+    assert smeli.candidates_are_same(preprint, proceedings)
+
+
+def test_candidates_are_same_rejects_larger_year_gap_for_metadata_match():
+    older = make_candidate(doi=None, arxiv_id=None, openalex_id="", year=2018)
+    newer = make_candidate(doi=None, arxiv_id=None, openalex_id="", year=2021)
+
+    assert not smeli.candidates_are_same(older, newer)

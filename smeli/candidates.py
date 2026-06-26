@@ -203,8 +203,13 @@ Returns:
     if openalex_a and openalex_b and openalex_a == openalex_b:
         return True
 
-    if a.get("year") and b.get("year") and str(a.get("year")) != str(b.get("year")):
-        return False
+    if a.get("year") and b.get("year"):
+        try:
+            years_compatible = abs(int(a.get("year")) - int(b.get("year"))) <= 1
+        except (TypeError, ValueError):
+            years_compatible = str(a.get("year")).strip() == str(b.get("year")).strip()
+        if not years_compatible:
+            return False
 
     similar_title = _title_similarity(a.get("title"), b.get("title")) >= 0.92
     if not similar_title:
