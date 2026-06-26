@@ -37,6 +37,43 @@ _AUTHOR_COLOR = "\033[38;5;208m"  # orange
 _YEAR_COLOR = "\033[34m"          # blue
 _ID_COLOR = "\033[38;5;205m"      # pink
 
+_USAGE = """Usage:
+  smeli
+  smeli [--list] <query-or-identifier>
+  smeli [--list] [--title TITLE] [--author AUTHOR] [--year YEAR]
+  smeli [--list] [--identifier IDENTIFIER]
+  smeli -h | --help
+
+Run Smeli with no arguments to open the interactive menu.
+Run it with a DOI, ORCID, arXiv ID, OpenAlex ID, or free-form bibliographic
+query to perform a one-shot lookup.
+
+Fielded options let you specify title, author, year, and identifier directly
+from the shell. Identifier resolution takes precedence over title/author/year
+searches, matching the interactive menu behavior.
+
+Options:
+  --title, -t TITLE            Search by paper title or title fragment.
+  --author, -a AUTHOR          Search by author name or name fragment.
+  --year, -y YEAR              Search/filter by publication year.
+  --identifier, -i IDENTIFIER  Look up a DOI, ORCID, arXiv ID, or OpenAlex ID.
+  --list                       Show a selectable result list even when there is one match.
+  -h, --help                   Show this help message and exit.
+
+Examples:
+  smeli 10.1126/science.1102081
+  smeli 0000-0002-0254-6627
+  smeli https://arxiv.org/abs/2507.11521v1
+  smeli still building the memex davies 1995
+  smeli --author "Stephen Davies" --title "Still building the memex" --year 1995
+  smeli -a "Starnini" -t "opinion dynamics"
+"""
+
+
+def _print_usage() -> None:
+    """Print command-line usage for the console script."""
+    print(_USAGE.strip())
+
 
 def _color_text(value: Any, color: str) -> str:
     """Return value as ANSI-colored text for terminal display."""
@@ -417,24 +454,115 @@ def _show_lookup_results(
     return True
 
 
-def _run_one_shot(args: list[str]) -> None:
-    """Run a non-menu lookup from command-line arguments."""
+def _take_option_value(args: list[str], index: int, option: str) -> tuple[str | None, int]:
+    """Return the value after an option and the next index to inspect."""
+    if index + 1 >= len(args):
+        print(f"smeli: {option} requires a value.\n")
+        _print_usage()
+        return None, len(args)
+    return args[index + 1], index + 2
+
+
+def _parse_one_shot_args(args: list[str]) -> tuple[dict[str, str | None], bool, bool]:
+    """Parse one-shot command-line arguments.
+
+    Return ``(search_data, force_list, direct_identifier)``. The parser is
+    intentionally small and preserves Smeli's original behavior of treating
+    unflagged positional arguments as one broad bibliographic query.
+    """
     force_list = False
     query_parts: list[str] = []
+    search_data: dict[str, str | None] = {
+        "title": None,
+        "author": None,
+        "year": None,
+        "identifier": None,
+        "query": None,
+    }
 
-    for arg in args:
+    i = 0
+    while i < len(args):
+        arg = args[i]
+
         if arg == "--list":
             force_list = True
-        else:
-            query_parts.append(arg)
+            i += 1
+            continue
+
+        if arg in {"--title", "-t"}:
+            value, i = _take_option_value(args, i, arg)
+            if value is None:
+                return search_data, force_list, False
+            search_data["title"] = value
+            continue
+        if arg.startswith("--title="):
+            search_data["title"] = arg.split("=", 1)[1]
+            i += 1
+            continue
+
+        if arg in {"--author", "-a"}:
+            value, i = _take_option_value(args, i, arg)
+            if value is None:
+                return search_data, force_list, False
+            search_data["author"] = value
+            continue
+        if arg.startswith("--author="):
+            search_data["author"] = arg.split("=", 1)[1]
+            i += 1
+            continue
+
+        if arg in {"--year", "-y"}:
+            value, i = _take_option_value(args, i, arg)
+            if value is None:
+                return search_data, force_list, False
+            search_data["year"] = value
+            continue
+        if arg.startswith("--year="):
+            search_data["year"] = arg.split("=", 1)[1]
+            i += 1
+            continue
+
+        if arg in {"--identifier", "-i"}:
+            value, i = _take_option_value(args, i, arg)
+            if value is None:
+                return search_data, force_list, False
+            search_data["identifier"] = value
+            continue
+        if arg.startswith("--identifier="):
+            search_data["identifier"] = arg.split("=", 1)[1]
+            i += 1
+            continue
+
+        if arg.startswith("-"):
+            print(f"smeli: unknown option: {arg}\n")
+            _print_usage()
+            return search_data, force_list, False
+
+        query_parts.append(arg)
+        i += 1
 
     query_text = " ".join(query_parts).strip()
-    if not query_text:
+    if query_text:
+        inferred = _infer_search_data_from_text(query_text)
+        for key, value in inferred.items():
+            if search_data.get(key) is None:
+                search_data[key] = value
+
+    direct_identifier = bool(search_data.get("identifier"))
+    return search_data, force_list, direct_identifier
+
+
+def _run_one_shot(args: list[str]) -> None:
+    """Run a non-menu lookup from command-line arguments."""
+    if any(arg in {"-h", "--help"} for arg in args):
+        _print_usage()
+        return
+
+    search_data, force_list, direct_identifier = _parse_one_shot_args(args)
+    if not any(search_data.values()):
         main([])
         return
 
-    search_data = _infer_search_data_from_text(query_text)
-    direct_identifier = bool(search_data.get("identifier"))
     _show_lookup_results(
         search_data,
         direct_identifier=direct_identifier,

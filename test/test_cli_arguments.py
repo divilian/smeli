@@ -140,3 +140,102 @@ def test_serialize_candidate_colors_title_author_year_and_ids():
     assert "Stephen Davies" in output
     assert "2011" in output
     assert "10.1145/1897816.1897840" in output
+
+
+def test_help_flag_prints_usage_without_lookup(monkeypatch, capsys):
+    monkeypatch.setattr(cli, "get_paper_candidates", lambda **kwargs: (_ for _ in ()).throw(AssertionError("help should not run lookup")))
+
+    cli.main(["-h"])
+
+    output = capsys.readouterr().out
+    assert "Usage:" in output
+    assert "smeli [--list] <query-or-identifier>" in output
+    assert "-h, --help" in output
+    assert "Examples:" in output
+
+
+def test_long_help_flag_prints_usage_without_lookup(monkeypatch, capsys):
+    monkeypatch.setattr(cli, "get_paper_candidates", lambda **kwargs: (_ for _ in ()).throw(AssertionError("help should not run lookup")))
+
+    cli._run_one_shot(["--help"])
+
+    output = capsys.readouterr().out
+    assert "Run Smeli with no arguments" in output
+    assert "--list" in output
+
+
+def test_parse_one_shot_fielded_long_options():
+    search_data, force_list, direct_identifier = cli._parse_one_shot_args([
+        "--author", "Stephen Davies",
+        "--title", "Still building the memex",
+        "--year", "1995",
+    ])
+
+    assert search_data["author"] == "Stephen Davies"
+    assert search_data["title"] == "Still building the memex"
+    assert search_data["year"] == "1995"
+    assert search_data["identifier"] is None
+    assert search_data["query"] is None
+    assert force_list is False
+    assert direct_identifier is False
+
+
+def test_parse_one_shot_fielded_short_options_and_list():
+    search_data, force_list, direct_identifier = cli._parse_one_shot_args([
+        "--list", "-a", "Starnini", "-t", "opinion dynamics", "-y", "2025",
+    ])
+
+    assert search_data["author"] == "Starnini"
+    assert search_data["title"] == "opinion dynamics"
+    assert search_data["year"] == "2025"
+    assert force_list is True
+    assert direct_identifier is False
+
+
+def test_parse_one_shot_identifier_option_takes_precedence():
+    search_data, _, direct_identifier = cli._parse_one_shot_args([
+        "--identifier", "10.1126/science.1102081",
+        "--author", "Someone Else",
+        "--title", "A Different Title",
+    ])
+
+    assert search_data["identifier"] == "10.1126/science.1102081"
+    assert search_data["author"] == "Someone Else"
+    assert search_data["title"] == "A Different Title"
+    assert direct_identifier is True
+
+
+def test_parse_one_shot_equals_forms():
+    search_data, _, _ = cli._parse_one_shot_args([
+        "--author=Stephen Davies",
+        "--title=Still building the memex",
+        "--year=1995",
+    ])
+
+    assert search_data["author"] == "Stephen Davies"
+    assert search_data["title"] == "Still building the memex"
+    assert search_data["year"] == "1995"
+
+
+def test_one_shot_fielded_options_call_lookup(monkeypatch):
+    calls = []
+
+    def fake_get_paper_candidates(**kwargs):
+        calls.append(kwargs)
+        return [{"title": "Still Building the Memex", "authors": ["Stephen Davies"]}]
+
+    def fake_print_selected_paper_details(candidate, *, pause_at_end=True):
+        calls.append({"selected": candidate, "pause_at_end": pause_at_end})
+
+    monkeypatch.setattr(cli, "get_paper_candidates", fake_get_paper_candidates)
+    monkeypatch.setattr(cli, "_choose_from_results", lambda results, **kwargs: (_ for _ in ()).throw(AssertionError("should not ask user to choose")))
+    monkeypatch.setattr(cli, "_print_selected_paper_details", fake_print_selected_paper_details)
+
+    cli._run_one_shot(["--author", "Stephen Davies", "--title", "Still building the memex", "--year", "1995"])
+
+    assert calls[0]["author"] == "Stephen Davies"
+    assert calls[0]["title"] == "Still building the memex"
+    assert calls[0]["year"] == "1995"
+    assert calls[0]["query"] is None
+    assert calls[1]["selected"]["title"] == "Still Building the Memex"
+    assert calls[1]["pause_at_end"] is False
