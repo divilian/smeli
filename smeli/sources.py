@@ -55,6 +55,7 @@ from .normalize import (
     _quote_doi_for_doi_org,
     _quote_doi_for_path,
     _split_words,
+    _maybe_int,
 )
 from .candidates import (
     _add_best_candidate_score,
@@ -64,6 +65,7 @@ from .candidates import (
     _author_names_from_datacite,
     bibliographic_query,
     canonical_candidate,
+    candidates_are_same,
     _candidate_matches,
     _candidate_matches_loose_query,
     _crossref_item_to_candidate,
@@ -832,6 +834,114 @@ Returns:
 
     return _openalex_item_to_candidate(data)
 
+def _arxiv_datacite_doi(arxiv_id: str | None) -> str | None:
+    """Return the standard arXiv DataCite DOI for an arXiv ID."""
+    arxiv_id = base_arxiv_id(arxiv_id)
+    if not arxiv_id:
+        return None
+    return f"10.48550/arXiv.{arxiv_id}"
+
+def _candidate_from_metadata(metadata: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Convert source-agnostic structured metadata into a candidate."""
+    if not metadata:
+        return None
+
+    return canonical_candidate({
+        "doi": metadata.get("doi"),
+        "title": metadata.get("title", ""),
+        "year": metadata.get("year"),
+        "authors": metadata.get("authors", []),
+        "venue": metadata.get("journal", ""),
+        "publisher": metadata.get("publisher", ""),
+        "cited_by_count": metadata.get("citations", 0),
+        "type": metadata.get("type", ""),
+        "source": metadata.get("source", ""),
+        "url": metadata.get("url", ""),
+    })
+
+def _matches_arxiv_enrichment(arxiv_candidate: dict[str, Any], candidate: dict[str, Any]) -> bool:
+    """Return whether a candidate is safe to merge into an arXiv record."""
+    if candidates_are_same(arxiv_candidate, candidate):
+        return True
+
+    title = arxiv_candidate.get("title") or ""
+    authors = arxiv_candidate.get("authors") or []
+    first_author = authors[0] if authors else None
+    if not title:
+        return False
+
+    if not _candidate_matches(
+        candidate,
+        author=first_author,
+        title=title,
+        year=None,
+        allow_loose_title=False,
+    ):
+        return False
+
+    arxiv_year = _maybe_int(arxiv_candidate.get("year"))
+    candidate_year = _maybe_int(candidate.get("year"))
+    if arxiv_year and candidate_year and abs(arxiv_year - candidate_year) > 2:
+        return False
+
+    return True
+
+def _tag_openalex_candidate_with_arxiv_id(
+    candidate: dict[str, Any],
+    arxiv_id: str | None,
+) -> dict[str, Any]:
+    """Annotate a matched OpenAlex candidate with the arXiv ID for merging."""
+    candidate = dict(candidate)
+    if arxiv_id and not candidate.get("arxiv_id"):
+        candidate["arxiv_id"] = arxiv_id
+    return canonical_candidate(candidate)
+
+def _get_arxiv_enrichment_candidates(arxiv_candidate: dict[str, Any]) -> list[dict[str, Any]]:
+    """Fetch DataCite/OpenAlex records that may enrich an arXiv candidate."""
+    candidates: list[dict[str, Any]] = []
+    arxiv_id = base_arxiv_id(arxiv_candidate.get("arxiv_id"))
+
+    arxiv_doi = _arxiv_datacite_doi(arxiv_id)
+    if arxiv_doi:
+        datacite_candidate = _candidate_from_metadata(get_metadata_from_datacite(arxiv_doi))
+        if datacite_candidate:
+            candidates.append(datacite_candidate)
+
+        # OpenAlex sometimes indexes the arXiv/DataCite DOI directly.
+        openalex_by_doi = _get_candidate_from_openalex_doi(arxiv_doi)
+        if openalex_by_doi and _matches_arxiv_enrichment(arxiv_candidate, openalex_by_doi):
+            candidates.append(_tag_openalex_candidate_with_arxiv_id(openalex_by_doi, arxiv_id))
+
+    # If OpenAlex does not know the arXiv DOI, it may still know the same work
+    # through a publisher/proceedings DOI. Search by arXiv metadata and merge
+    # only records that match the arXiv title/authors locally. Do not require
+    # the same publication year: preprints and proceedings versions commonly
+    # differ by a year, as with BERT's 2018 arXiv record and 2019 NAACL record.
+    if not any(candidate.get("openalex_id") for candidate in candidates):
+        title = arxiv_candidate.get("title") or ""
+        authors = arxiv_candidate.get("authors") or []
+        first_author = authors[0] if authors else None
+
+        openalex_candidates: list[dict[str, Any]] = []
+        if title:
+            openalex_candidates.extend(
+                get_paper_candidates_from_openalex(
+                    author=first_author,
+                    title=title,
+                    year=None,
+                )
+            )
+            if not openalex_candidates:
+                openalex_candidates.extend(
+                    _get_paper_candidates_from_openalex_loose(title, year=None)
+                )
+
+        for candidate in openalex_candidates:
+            if _matches_arxiv_enrichment(arxiv_candidate, candidate):
+                candidates.append(_tag_openalex_candidate_with_arxiv_id(candidate, arxiv_id))
+
+    return candidates
+
 def get_candidate_from_arxiv_id(arxiv_id: str) -> dict[str, Any] | None:
     """Fetch a single candidate by arXiv ID.
 
@@ -863,7 +973,15 @@ Returns:
     if entry is None:
         return None
 
-    return _arxiv_entry_to_candidate(entry)
+    arxiv_candidate = _arxiv_entry_to_candidate(entry)
+    if not arxiv_candidate:
+        return None
+
+    candidates = [arxiv_candidate]
+    candidates.extend(_get_arxiv_enrichment_candidates(arxiv_candidate))
+
+    merged = merge_candidate_list(candidates)
+    return merged[0] if merged else arxiv_candidate
 
 def get_candidate_from_doi(doi: str) -> dict[str, Any] | None:
     """Build a single candidate around a known DOI.

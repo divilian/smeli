@@ -162,3 +162,115 @@ def test_get_paper_candidates_can_report_progress_to_callback(monkeypatch):
     assert "  Crossref..." in messages
     assert "  DataCite..." in messages
     assert "  arXiv..." in messages
+
+
+def test_get_candidate_from_arxiv_id_enriches_with_datacite_and_openalex(monkeypatch):
+    atom = """<?xml version="1.0" encoding="UTF-8"?>
+    <feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom">
+      <entry>
+        <id>http://arxiv.org/abs/1810.04805v2</id>
+        <title>BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding</title>
+        <published>2018-10-11T00:00:00Z</published>
+        <author><name>Jacob Devlin</name></author>
+        <author><name>Ming-Wei Chang</name></author>
+        <author><name>Kenton Lee</name></author>
+        <author><name>Kristina Toutanova</name></author>
+        <link href="http://arxiv.org/abs/1810.04805v2" rel="alternate" />
+        <arxiv:primary_category term="cs.CL" />
+      </entry>
+    </feed>
+    """
+
+    calls = []
+
+    def fake_fetch_text(url, *, source="request", **kwargs):
+        calls.append(("text", source, kwargs.get("params", {})))
+        return atom
+
+    def fake_datacite(doi):
+        calls.append(("datacite", doi))
+        return {
+            "source": "DataCite",
+            "doi": "10.48550/arXiv.1810.04805",
+            "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+            "authors": ["Jacob Devlin", "Ming-Wei Chang", "Kenton Lee", "Kristina Toutanova"],
+            "journal": "",
+            "publisher": "arXiv",
+            "citations": 0,
+            "year": 2018,
+            "type": "Preprint",
+            "url": "https://arxiv.org/abs/1810.04805",
+        }
+
+    def fake_openalex_doi(doi):
+        calls.append(("openalex_doi", doi))
+        return None
+
+    def fake_openalex_search(**kwargs):
+        calls.append(("openalex_search", kwargs))
+        return [
+            {
+                "source": "OpenAlex",
+                "metadata_sources": ["OpenAlex"],
+                "doi": "10.18653/v1/N19-1423",
+                "arxiv_id": "1810.04805",
+                "openalex_id": "https://openalex.org/W123",
+                "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+                "year": 2019,
+                "authors": ["Jacob Devlin", "Ming-Wei Chang", "Kenton Lee", "Kristina Toutanova"],
+                "venue": "NAACL",
+                "publisher": "Association for Computational Linguistics",
+                "type": "article",
+                "url": "https://doi.org/10.18653/v1/N19-1423",
+                "cited_by_count": 172572,
+            }
+        ]
+
+    monkeypatch.setattr(smeli.sources, "_fetch_text", fake_fetch_text)
+    monkeypatch.setattr(smeli.sources, "get_metadata_from_datacite", fake_datacite)
+    monkeypatch.setattr(smeli.sources, "_get_candidate_from_openalex_doi", fake_openalex_doi)
+    monkeypatch.setattr(smeli.sources, "get_paper_candidates_from_openalex", fake_openalex_search)
+    monkeypatch.setattr(smeli.sources, "_get_paper_candidates_from_openalex_loose", lambda *args, **kwargs: [])
+
+    candidate = smeli.get_candidate_from_arxiv_id("1810.04805")
+
+    assert candidate["arxiv_id"] == "1810.04805"
+    assert candidate["doi"] == "10.48550/arXiv.1810.04805"
+    assert candidate["openalex_id"] == "https://openalex.org/W123"
+    assert candidate["cited_by_count"] == 172572
+    assert candidate["metadata_sources"] == ["arXiv", "DataCite", "OpenAlex"]
+    assert ("datacite", "10.48550/arXiv.1810.04805") in calls
+    assert ("openalex_doi", "10.48550/arXiv.1810.04805") in calls
+    assert (
+        "openalex_search",
+        {
+            "author": "Jacob Devlin",
+            "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+            "year": None,
+        },
+    ) in calls
+
+
+def test_get_candidate_from_arxiv_id_returns_arxiv_when_enrichment_misses(monkeypatch):
+    atom = """<?xml version="1.0" encoding="UTF-8"?>
+    <feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom">
+      <entry>
+        <id>http://arxiv.org/abs/2507.11521v1</id>
+        <title>Opinion dynamics: Statistical physics and beyond</title>
+        <published>2025-07-15T00:00:00Z</published>
+        <author><name>Michele Starnini</name></author>
+      </entry>
+    </feed>
+    """
+
+    monkeypatch.setattr(smeli.sources, "_fetch_text", lambda *args, **kwargs: atom)
+    monkeypatch.setattr(smeli.sources, "get_metadata_from_datacite", lambda *args, **kwargs: None)
+    monkeypatch.setattr(smeli.sources, "_get_candidate_from_openalex_doi", lambda *args, **kwargs: None)
+    monkeypatch.setattr(smeli.sources, "get_paper_candidates_from_openalex", lambda *args, **kwargs: [])
+    monkeypatch.setattr(smeli.sources, "_get_paper_candidates_from_openalex_loose", lambda *args, **kwargs: [])
+
+    candidate = smeli.get_candidate_from_arxiv_id("2507.11521")
+
+    assert candidate["source"] == "arXiv"
+    assert candidate["metadata_sources"] == ["arXiv"]
+    assert candidate["cited_by_count"] == 0
