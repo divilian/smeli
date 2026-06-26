@@ -41,6 +41,16 @@ pytest
 
 ## Sample DOIs
 
-- `10.1126/science.1102081`
-- `10.1080/03075079.2021.1972093`
-- `10.1145/1897816.1897840`
+- _Attention is All you Need_: `10.65215/2q58a426` (DataCite)
+- _BERT_: `10.48550/arXiv.1810.04805` (DataCite)
+- _Still Building the Memex_: `10.1145/1897816.1897840` (Crossref)
+- _XGBoost_: `10.1145/2939672.2939785` (Crossref)
+
+## Sample ORCIDs
+
+These are useful for trying the author-oriented lookup path:
+
+- Geoffrey Hinton: `0000-0002-8063-7209`
+- Jennifer Doudna: `0000-0001-9161-999X`
+- Katalin Karikó: `0000-0002-1864-3851`
+- Tim Berners-Lee: `0000-0003-1279-3709`
