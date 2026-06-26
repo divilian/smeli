@@ -241,3 +241,77 @@ def test_arxiv_datacite_doi_metadata_uses_enriched_candidate(monkeypatch):
     assert metadata["citations"] == 172572
     assert metadata["metadata_sources"] == ["DataCite", "OpenAlex"]
     assert metadata["openalex_id"] == "https://openalex.org/W2963341956"
+
+
+def test_arxiv_id_candidate_gets_datacite_and_openalex_enrichment(monkeypatch):
+    atom = '''<?xml version="1.0" encoding="UTF-8"?>
+    <feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom">
+      <entry>
+        <id>http://arxiv.org/abs/1810.04805v2</id>
+        <title>BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding</title>
+        <published>2018-10-11T00:50:01Z</published>
+        <author><name>Jacob Devlin</name></author>
+        <author><name>Ming-Wei Chang</name></author>
+        <author><name>Kenton Lee</name></author>
+        <author><name>Kristina Toutanova</name></author>
+        <arxiv:primary_category term="cs.CL" />
+      </entry>
+    </feed>
+    '''
+
+    def fake_get_candidate_from_doi(value):
+        assert value == "10.48550/arXiv.1810.04805"
+        return {
+            "source": "DataCite",
+            "metadata_sources": ["DataCite"],
+            "doi": value,
+            "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+            "authors": ["Devlin, Jacob", "Chang, Ming-Wei", "Lee, Kenton", "Toutanova, Kristina"],
+            "year": 2018,
+            "venue": "",
+            "publisher": "arXiv",
+            "type": "Article",
+            "cited_by_count": 75,
+            "citation_source": "DataCite",
+            "citation_sources": {"DataCite": 75},
+            "arxiv_id": "1810.04805",
+            "openalex_id": "",
+            "url": "https://arxiv.org/abs/1810.04805",
+        }
+
+    def fake_openalex_search(**kwargs):
+        assert kwargs["title"] == "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding"
+        assert kwargs["author"] == "devlin"
+        return [
+            {
+                "source": "OpenAlex",
+                "metadata_sources": ["OpenAlex"],
+                "doi": "10.18653/v1/N19-1423",
+                "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+                "authors": ["Jacob Devlin", "Ming-Wei Chang", "Kenton Lee", "Kristina Toutanova"],
+                "year": 2019,
+                "venue": "NAACL",
+                "publisher": "ACL",
+                "type": "article",
+                "cited_by_count": 172572,
+                "citation_source": "OpenAlex",
+                "citation_sources": {"OpenAlex": 172572},
+                "arxiv_id": "",
+                "openalex_id": "https://openalex.org/W2963341956",
+                "url": "https://aclanthology.org/N19-1423/",
+            }
+        ]
+
+    monkeypatch.setattr(smeli.sources, "_fetch_text", lambda *args, **kwargs: atom)
+    monkeypatch.setattr(smeli.sources, "get_candidate_from_doi", fake_get_candidate_from_doi)
+    monkeypatch.setattr(smeli.sources, "get_paper_candidates_from_openalex", fake_openalex_search)
+
+    candidate = smeli.get_candidate_from_arxiv_id("1810.04805")
+
+    assert candidate["doi"] == "10.48550/arXiv.1810.04805"
+    assert candidate["arxiv_id"] == "1810.04805"
+    assert candidate["openalex_id"] == "https://openalex.org/W2963341956"
+    assert candidate["cited_by_count"] == 172572
+    assert candidate["citation_source"] == "OpenAlex"
+    assert candidate["citation_sources"] == {"arXiv": 0, "DataCite": 75, "OpenAlex": 172572}
+    assert candidate["metadata_sources"] == ["arXiv", "DataCite", "OpenAlex"]

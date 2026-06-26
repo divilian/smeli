@@ -18,7 +18,9 @@ Smeli deliberately uses dictionaries rather than a custom class because source A
 | `arxiv_id` | `str | None` | Bare arXiv ID without version suffix where possible. |
 | `openalex_id` | `str` | OpenAlex Work URL/ID when available. |
 | `url` | `str` | Best landing URL known to Smeli. |
-| `cited_by_count` | `int` | Citation count from the source, usually OpenAlex or Crossref. |
+| `cited_by_count` | `int` | Best available citation count after merging source records. |
+| `citation_source` | `str` | Source that supplied the selected citation count, when known. |
+| `citation_sources` | `dict[str, int]` | Per-source citation counts retained during merging. |
 | `metadata_sources` | `list[str]` | Sources that contributed metadata to the merged candidate. |
 | `score` | `int` | Smeli's local relevance score for display/ranking. |
 | `citation_score` | `int` | Weak citation-count tie-breaker used during ranking. |

@@ -77,6 +77,31 @@ Notes:
     if source and source not in candidate["metadata_sources"]:
         candidate["metadata_sources"].append(source)
 
+    citation_sources = candidate.get("citation_sources")
+    has_explicit_citation_sources = isinstance(citation_sources, dict) and bool(citation_sources)
+    if not isinstance(citation_sources, dict):
+        citation_sources = {}
+
+    citations = _maybe_int(candidate.get("cited_by_count"))
+    if source and citations is not None and not has_explicit_citation_sources:
+        citation_sources[source] = max(
+            _maybe_int(citation_sources.get(source)) or 0,
+            citations,
+        )
+
+    normalized_citation_sources: dict[str, int] = {}
+    for citation_source, count in citation_sources.items():
+        count_int = _maybe_int(count)
+        if citation_source and count_int is not None:
+            normalized_citation_sources[str(citation_source)] = count_int
+    candidate["citation_sources"] = normalized_citation_sources
+
+    if normalized_citation_sources:
+        candidate["citation_source"] = max(
+            normalized_citation_sources,
+            key=lambda citation_source: normalized_citation_sources[citation_source],
+        )
+
     if candidate["arxiv_id"] and not candidate.get("url"):
         candidate["url"] = make_arxiv_url(candidate["arxiv_id"])
 
@@ -276,6 +301,32 @@ Notes:
         _maybe_int(merged.get("cited_by_count")) or 0,
         _maybe_int(secondary.get("cited_by_count")) or 0,
     )
+
+    citation_sources: dict[str, int] = {}
+    for candidate in (merged, secondary):
+        for citation_source, count in (candidate.get("citation_sources") or {}).items():
+            count_int = _maybe_int(count)
+            if citation_source and count_int is not None:
+                citation_sources[str(citation_source)] = max(
+                    citation_sources.get(str(citation_source), 0),
+                    count_int,
+                )
+
+        candidate_has_explicit_citation_sources = bool(candidate.get("citation_sources"))
+        candidate_source = candidate.get("source")
+        candidate_count = _maybe_int(candidate.get("cited_by_count"))
+        if candidate_source and candidate_count is not None and not candidate_has_explicit_citation_sources:
+            citation_sources[str(candidate_source)] = max(
+                citation_sources.get(str(candidate_source), 0),
+                candidate_count,
+            )
+
+    if citation_sources:
+        merged["citation_sources"] = citation_sources
+        merged["citation_source"] = max(
+            citation_sources,
+            key=lambda citation_source: citation_sources[citation_source],
+        )
 
     sources = []
     for source in merged.get("metadata_sources", []) + secondary.get("metadata_sources", []):

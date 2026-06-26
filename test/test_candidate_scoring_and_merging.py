@@ -104,3 +104,24 @@ def test_candidates_are_same_rejects_larger_year_gap_for_metadata_match():
     newer = make_candidate(doi=None, arxiv_id=None, openalex_id="", year=2021)
 
     assert not smeli.candidates_are_same(older, newer)
+
+
+def test_merge_candidates_tracks_best_citation_source():
+    datacite = make_candidate(
+        source="DataCite",
+        metadata_sources=["DataCite"],
+        cited_by_count=75,
+        citation_sources={"DataCite": 75},
+    )
+    openalex = make_candidate(
+        source="OpenAlex",
+        metadata_sources=["OpenAlex"],
+        cited_by_count=172572,
+        citation_sources={"OpenAlex": 172572},
+    )
+
+    merged = smeli.merge_candidates(datacite, openalex)
+
+    assert merged["cited_by_count"] == 172572
+    assert merged["citation_source"] == "OpenAlex"
+    assert merged["citation_sources"] == {"DataCite": 75, "OpenAlex": 172572}

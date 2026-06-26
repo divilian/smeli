@@ -22,6 +22,17 @@ smeli still building the memex davies
 
 Identifier and free-form lookups go straight to paper details when exactly one paper is found. ORCID lookups usually return an author's ranked paper list.
 
+## Optional environment variables
+
+Smeli works without private credentials, but you can create a local `.env` file in the project root to identify your requests and enable authenticated OpenAlex requests:
+
+```dotenv
+DOI_EMAIL=youremail
+OPENALEX_API_KEY=apikey
+```
+
+`DOI_EMAIL` is included in Smeli's HTTP `User-Agent` so DOI services have a contact address for polite API use. `OPENALEX_API_KEY` is optional; when present, Smeli includes it on OpenAlex requests.
+
 ## API documentation
 
 The public Python API is documented in `docs/` and can be served locally with MkDocs:

@@ -186,7 +186,9 @@ def _serialize_candidate(
     retval += f"   {_color_author(authors)} ({_color_year(year)})\n"
     retval += f"   {venue}\n"
     if citations is not None:
-        retval += f"   citations: {citations}\n"
+        citation_source = candidate.get("citation_source")
+        source_suffix = f" ({citation_source})" if citation_source else ""
+        retval += f"   citations: {citations}{source_suffix}\n"
     if candidate.get("match_note"):
         retval += f"   match note: {candidate.get('match_note')}\n"
     retval += f"   metadata sources: {source_text}\n"
@@ -228,6 +230,8 @@ def _print_selected_paper_metadata(candidate: dict[str, Any]) -> None:
         "publisher": candidate.get("publisher", ""),
         "type": candidate.get("type", ""),
         "citations": candidate.get("cited_by_count", 0),
+        "citation_source": candidate.get("citation_source", ""),
+        "citation_sources": candidate.get("citation_sources", {}),
         "metadata_sources": candidate.get("metadata_sources", []),
         "doi": candidate.get("doi"),
         "arxiv_id": candidate.get("arxiv_id"),

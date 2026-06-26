@@ -198,6 +198,10 @@ def _metadata_from_candidate(candidate: dict[str, Any] | None) -> dict[str, Any]
         metadata["openalex_id"] = candidate["openalex_id"]
     if candidate.get("metadata_sources"):
         metadata["metadata_sources"] = candidate["metadata_sources"]
+    if candidate.get("citation_source"):
+        metadata["citation_source"] = candidate["citation_source"]
+    if candidate.get("citation_sources"):
+        metadata["citation_sources"] = candidate["citation_sources"]
     return metadata
 
 def _get_candidate_from_openalex_doi(doi: str) -> dict[str, Any] | None:
@@ -214,6 +218,83 @@ def _get_candidate_from_openalex_doi(doi: str) -> dict[str, Any] | None:
 
     return _openalex_item_to_candidate(data)
 
+
+
+
+def _candidate_from_structured_metadata(
+    metadata: dict[str, Any],
+    *,
+    source: str | None = None,
+    doi: str | None = None,
+) -> dict[str, Any]:
+    """Convert a structured metadata dictionary into a Smeli candidate."""
+    candidate_source = source or metadata.get("source", "")
+    return canonical_candidate({
+        "doi": doi or metadata.get("doi"),
+        "title": metadata.get("title", ""),
+        "year": metadata.get("year"),
+        "authors": metadata.get("authors", []),
+        "venue": metadata.get("journal", ""),
+        "publisher": metadata.get("publisher", ""),
+        "cited_by_count": metadata.get("citations", 0),
+        "type": metadata.get("type", ""),
+        "source": candidate_source,
+        "url": metadata.get("url", ""),
+    })
+
+
+def _arxiv_datacite_doi(arxiv_id: str | None) -> str | None:
+    """Return arXiv's DataCite DOI for a bare arXiv ID, when possible."""
+    bare_arxiv_id = base_arxiv_id(arxiv_id)
+    if not bare_arxiv_id:
+        return None
+    return f"10.48550/arXiv.{bare_arxiv_id}"
+
+
+def _unique_dois(values: list[str | None]) -> list[str]:
+    """Return normalized DOI strings, deduplicated case-insensitively."""
+    unique: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        doi = clean_doi(value)
+        if not doi:
+            continue
+        key = doi.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(doi)
+    return unique
+
+
+def _merge_with_openalex_bibliographic_enrichment(
+    candidates: list[dict[str, Any]],
+    anchor: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Add the best OpenAlex bibliographic match for a known candidate."""
+    bibliographic_openalex_candidate = _get_candidate_from_openalex_bibliographic_match(anchor)
+    if bibliographic_openalex_candidate:
+        candidates.append(bibliographic_openalex_candidate)
+    return candidates
+
+
+def _enrich_arxiv_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
+    """Merge an arXiv candidate with DataCite/OpenAlex work metadata."""
+    candidates: list[dict[str, Any]] = [canonical_candidate(candidate)]
+
+    related_dois = _unique_dois([
+        candidate.get("doi"),
+        _arxiv_datacite_doi(candidate.get("arxiv_id")),
+    ])
+
+    for doi in related_dois:
+        doi_candidate = get_candidate_from_doi(doi)
+        if doi_candidate:
+            candidates.append(doi_candidate)
+
+    _merge_with_openalex_bibliographic_enrichment(candidates, candidate)
+    merged = merge_candidate_list(candidates)
+    return merged[0] if merged else canonical_candidate(candidate)
 
 def _looks_like_arxiv_datacite_doi(doi: str | None) -> bool:
     """Return whether a DOI is one of arXiv's DataCite DOI forms."""
@@ -940,7 +1021,8 @@ Returns:
     if entry is None:
         return None
 
-    return _arxiv_entry_to_candidate(entry)
+    candidate = _arxiv_entry_to_candidate(entry)
+    return _enrich_arxiv_candidate(candidate) if candidate else None
 
 def get_candidate_from_doi(doi: str) -> dict[str, Any] | None:
     """Build a single candidate around a known DOI.
@@ -961,35 +1043,11 @@ Returns:
 
     metadata = get_metadata_from_crossref(doi)
     if metadata:
-        candidate = {
-            "doi": doi,
-            "title": metadata.get("title", ""),
-            "year": metadata.get("year"),
-            "authors": metadata.get("authors", []),
-            "venue": metadata.get("journal", ""),
-            "publisher": metadata.get("publisher", ""),
-            "cited_by_count": metadata.get("citations", 0),
-            "type": metadata.get("type", ""),
-            "source": "Crossref",
-            "url": metadata.get("url", ""),
-        }
-        candidates.append(canonical_candidate(candidate))
+        candidates.append(_candidate_from_structured_metadata(metadata, source="Crossref", doi=doi))
 
     datacite = get_metadata_from_datacite(doi)
     if datacite:
-        candidate = {
-            "doi": doi,
-            "title": datacite.get("title", ""),
-            "year": datacite.get("year"),
-            "authors": datacite.get("authors", []),
-            "venue": datacite.get("journal", ""),
-            "publisher": datacite.get("publisher", ""),
-            "cited_by_count": datacite.get("citations", 0),
-            "type": datacite.get("type", ""),
-            "source": "DataCite",
-            "url": datacite.get("url", ""),
-        }
-        candidates.append(canonical_candidate(candidate))
+        candidates.append(_candidate_from_structured_metadata(datacite, source="DataCite", doi=doi))
 
     # OpenAlex may have ORCIDs, citation counts, and a better landing page.
     openalex_candidate = _get_candidate_from_openalex_doi(doi)
@@ -1001,21 +1059,8 @@ Returns:
     # bibliographic OpenAlex match so famous preprints do not display the much
     # smaller DataCite DOI citation count as if it were the paper-level count.
     if datacite and _looks_like_arxiv_datacite_doi(doi):
-        datacite_candidate = canonical_candidate({
-            "doi": doi,
-            "title": datacite.get("title", ""),
-            "year": datacite.get("year"),
-            "authors": datacite.get("authors", []),
-            "venue": datacite.get("journal", ""),
-            "publisher": datacite.get("publisher", ""),
-            "cited_by_count": datacite.get("citations", 0),
-            "type": datacite.get("type", ""),
-            "source": "DataCite",
-            "url": datacite.get("url", ""),
-        })
-        bibliographic_openalex_candidate = _get_candidate_from_openalex_bibliographic_match(datacite_candidate)
-        if bibliographic_openalex_candidate:
-            candidates.append(bibliographic_openalex_candidate)
+        datacite_candidate = _candidate_from_structured_metadata(datacite, source="DataCite", doi=doi)
+        _merge_with_openalex_bibliographic_enrichment(candidates, datacite_candidate)
 
     if not candidates:
         return canonical_candidate({
