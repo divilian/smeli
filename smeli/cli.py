@@ -112,16 +112,27 @@ def _identifier_type(identifier: str | None) -> str | None:
     return None
 
 
+def _format_metadata_value(value: Any) -> str:
+    """Return a readable value for metadata display.
+
+    Plain strings are printed as strings, not Python reprs. Containers still use
+    ``pformat`` so nested metadata remains readable.
+    """
+    if isinstance(value, str):
+        return value
+    return pformat(value, sort_dicts=False)
+
+
 def _colored_pformat(key: str, value: Any) -> str:
     """Pretty-format a value, adding Smeli's display colors for key fields."""
-    rendered = pformat(value)
+    rendered = _format_metadata_value(value)
     if key == "title":
         return _color_title(rendered)
     if key == "authors":
         return _color_author(rendered)
     if key == "year":
         return _color_year(rendered)
-    if key in {"doi", "arxiv_id", "openalex_id"}:
+    if key in {"doi", "arxiv_id", "openalex_id", "work_level_doi"}:
         return _color_identifier(rendered)
     return rendered
 
@@ -222,7 +233,7 @@ def _print_list_of_dicts(ld: list[dict[str, Any]]) -> None:
 def _print_selected_paper_metadata(candidate: dict[str, Any]) -> None:
     """Print the metadata already present on a selected candidate."""
     print("\n--- Candidate metadata ---")
-    _print_dict({
+    metadata = {
         "title": candidate.get("title", ""),
         "authors": candidate.get("authors", []),
         "year": candidate.get("year"),
@@ -237,7 +248,12 @@ def _print_selected_paper_metadata(candidate: dict[str, Any]) -> None:
         "arxiv_id": candidate.get("arxiv_id"),
         "openalex_id": candidate.get("openalex_id"),
         "url": candidate.get("url", ""),
-    })
+    }
+    if candidate.get("work_level_doi"):
+        metadata["work_level_doi"] = candidate.get("work_level_doi")
+    if candidate.get("citation_note"):
+        metadata["citation_note"] = candidate.get("citation_note")
+    _print_dict(metadata)
 
 def _print_selected_paper_details(
     candidate: dict[str, Any],

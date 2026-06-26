@@ -71,3 +71,29 @@ def test_doi_less_work_prints_generated_bibtex(monkeypatch, capsys):
     assert "DOI-specific enrichment skipped" in output
     assert "--- Generated BibTeX-like entry from available metadata ---" in output
     assert "citation key: starnini2025" in output
+
+
+def test_metadata_display_prints_strings_without_python_repr_wrapping(capsys):
+    long_title = "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding"
+
+    cli._print_selected_paper_metadata({
+        "title": long_title,
+        "authors": ["Devlin, Jacob"],
+        "year": 2018,
+        "venue": "",
+        "publisher": "arXiv",
+        "type": "Article",
+        "cited_by_count": 75,
+        "citation_source": "DataCite",
+        "citation_sources": {"DataCite": 75},
+        "metadata_sources": ["DataCite"],
+        "doi": "10.48550/arXiv.1810.04805",
+        "arxiv_id": "1810.04805",
+        "openalex_id": "",
+        "url": "https://arxiv.org/abs/1810.04805",
+    })
+
+    output = capsys.readouterr().out
+    assert long_title in output
+    assert "title: ('BERT" not in output
+    assert "Understanding')" not in output
