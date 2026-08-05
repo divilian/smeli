@@ -71,4 +71,4 @@ These are useful for trying the author-oriented lookup path:
 For bug reports, feature requests, or API questions, please open an issue on the
 [Smeli GitHub repository](https://github.com/divilian/smeli).
 
-For other questions, contact [Stephen Davies](https://stephendavies.org/).
+For other questions, contact [Stephen Davies](http://stephendavies.org/).
