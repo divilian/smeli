@@ -43,4 +43,12 @@ Use `--list` with either style to force a selectable result list even when Smeli
 smeli --list --author "Stephen Davies" --title "Still building the memex"
 ```
 
+## Importing BibTeX into Zotero
+
+When Smeli displays a BibTeX entry, Zotero can create a new library item directly from it:
+
+1. Copy the complete BibTeX entry to the clipboard.
+2. In Zotero, choose **File → Import from Clipboard**.
+3. Zotero parses the BibTeX metadata and creates the new item in the currently selected library or collection.
+
 `smeli.cli.main()` is public because it is the console-script target. Python package users should usually call functions from `smeli.sources` instead.
