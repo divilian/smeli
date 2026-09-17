@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block js %}
+<script>
+
+let searchParams = {};
+
+function handleParam() {
+    // Grab the current state of the inputs
+    const typeSelect = document.getElementById("search-type");
+    let inType = typeSelect.value;
+
+    const parameterInput = document.getElementById("param-in");
+    let inVal = parameterInput.value;
+
+    // Handle if user has already put this input in
+    if (inType in searchParams ) {
+        searchParams[inType] = inVal;
+    
+        let param = document.getElementById(inType + "-param");
+        param.innerHTML = inVal + ` <b>ⓧ</b>`;
+    }
+
+    // First input handle
+    else {
+        searchParams[inType] = inVal;
+
+        let paramButton = document.createElement("button");
+        paramButton.className = "param-button";
+        paramButton.id = inType + "-button";
+        paramButton.className = "param-button";
+
+        // Break up the val and type for styling and updating purposes
+        // TODO add class names
+        let paramType = document.createElement("span");
+        paramType.id = inType + "-type";
+        paramType.innerText = inType + ": ";
+
+        let paramVal = document.createElement("span");
+        paramVal.id = inType + "-param";
+        paramVal.innerHTML = inVal + ` <b>ⓧ</b>`;
+
+        paramButton.appendChild(paramType);
+        paramButton.appendChild(paramVal);
+
+        paramButton.addEventListener("click", (event) => {
+            delete searchParams[inType];
+            paramButton.remove();
+        });
+
+        document.getElementById("params-container").appendChild(paramButton);
+        
+    }
+}
+
+
+async function lookup() {
+    let queryString = "?"
+    for (const [param, value] of Object.entries(searchParams)) {
+        queryString += param.toLowerCase() + "=" + value.replaceAll(" ", "+")
+    }
+    console.log(queryString);
+    const canPromise = await fetch(`/api/lookup${queryString}`);
+    const candidates = await canPromise.json();
+
+    const resultsDiv = document.getElementById("results");
+    for (let i = 0; i < candidates.length; i++) {
+        let newResult = document.createElement("div");
+        newResult.innerHTML = `
+            <h4>${i + 1}. ${candidates[i]['title']} [relevance: ${candidates[i]['score']}, cites: ${candidates[i]['citation_score']}] </h4>
+            <p>${candidates[i]['authors']} (${candidates[i]['year']})</p>
+            <p>URL: <a href="${candidates[i]['url']}" target="_blank">${candidates[i]['url']}</a></p>
+            <br>
+        `;
+        resultsDiv.appendChild(newResult);
+    }
+
+}
+
+</script>
+{% endblock %}
+{% block title %}
+SMELI
+{% endblock %}
+{% block content %}
+<div class="centered-block">
+    <div class="left-block">
+    </div>
+    <div class="middle-block">
+        <select class="search-type" id="search-type">
+            <option value="Title">Title</option>
+            <option value="Author">Author</option>
+            <option value="Year">Year</option>
+            <option value="Identifier">Identifier</option>
+        </select>
+        <input class="parameter-input" type="text" id="param-in" placeholder="Value to Search"/>
+        <button class="submit-parameter" id="param-submit">
+            Add Parameter
+        </button>
+        <script>
+            const button = document.getElementById("param-submit");
+
+            button.addEventListener("click", (event) => {
+                handleParam();
+            });
+
+            const input = document.getElementById("param-in");
+
+            input.addEventListener("keydown", (e)=> {
+                if (!e.repeat && e.key == "Enter") {
+                    handleParam();
+                    input.value = "";
+                }
+            });
+        </script>
+
+        <div class="params-container" id="params-container">
+        </div>
+        <div class="search-block" id="search-block">
+            <button id="refresh-search" class="big-center-button">
+                Search
+            </button>
+            <div id="results">
+            </div>
+            <script>
+                const searchButton = document.getElementById("refresh-search");
+
+                const resultsDiv = document.getElementById("results");
+                searchButton.addEventListener("click", (event) => {
+                    resultsDiv.replaceChildren();
+                    lookup();
+                });
+            </script>
+        </div>
+    </div>
+    <div class="right-block">
+    </div>
+</div>
+{% endblock %}

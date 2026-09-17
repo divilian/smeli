@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        {% block js %}
+        {% endblock %}
+        <title>{% block title %}SMELI{% endblock %}</title>
+        <link rel="stylesheet" href="{{ url_for('static', filename='stylesheet.css') }}">
+        <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+    </head>
+    <body>
+        <img class="banner" src="{{ url_for('static', filename='banner.png') }}">
+        {% block content %}
+        {% endblock %}
+    </body>
+</html>
