@@ -6,6 +6,19 @@ It searches for scholarly paper metadata across OpenAlex, Crossref, DataCite, an
 
 ## Run locally
 
+Clone the repo and enter it
+
+```bash
+git clone https://github.com/divilian/smeli.git
+cd smeli
+```
+
+Install the repo. This can either be done in a python virtual environment or directly on your machine
+
+```bash
+pip install .
+```
+
 After installing the project, the console command is:
 
 ```bash
