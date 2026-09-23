@@ -22,6 +22,9 @@ docs = [
     "ruff",
 ]
 
+[tool.setuptools.packages.find]
+include = ["smeli*"]
+
 [tool.pytest.ini_options]
 testpaths = ["test"]
 pythonpath = ["."]

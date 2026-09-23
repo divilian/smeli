@@ -58,7 +58,10 @@ async function lookup() {
     for (const [param, value] of Object.entries(searchParams)) {
         queryString += param.toLowerCase() + "=" + value.replaceAll(" ", "+")
     }
-    console.log(queryString);
+
+    const loadingDiv = document.getElementById("loading-results");
+    loadingDiv.classList.remove("hidden");
+
     const canPromise = await fetch(`/api/lookup${queryString}`);
     const candidates = await canPromise.json();
 
@@ -73,6 +76,7 @@ async function lookup() {
         `;
         resultsDiv.appendChild(newResult);
     }
+    loadingDiv.classList.add("hidden");
 
 }
 
@@ -119,6 +123,9 @@ SMELI
             <button id="refresh-search" class="big-center-button">
                 Search
             </button>
+            <div id="loading-results" class="loading hidden">
+                Loading Candidates...
+            </div>
             <div id="results">
             </div>
             <script>
