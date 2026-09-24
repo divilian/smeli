@@ -11,6 +11,18 @@ def index():
 def smeli():
     return render_template("smeli.html")
 
+@smeli_app.route("searchfilter")
+def search_filter():
+    lookup_criteria = dict()
+    for criteria in { 'author', 'title', 'year', 'identified' }:
+        if criteria in request.args:
+            lookup_criteria[criteria] = request.args[criteria]
+
+    if !lookup_criteria:
+        return render_template("searchFilter.html", data=None)
+    candidates = get_paper_candidates( **lookup_criteria )
+    return render_template("searchFilter.html", data=candidates)
+
 @smeli_app.route("/api/lookup")
 def lookup():
     lookup_criteria = dict()
@@ -20,3 +32,4 @@ def lookup():
 
     candidates = get_paper_candidates( **lookup_criteria )
     return jsonify(candidates)
+
