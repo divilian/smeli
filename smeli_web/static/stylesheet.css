@@ -124,5 +124,18 @@ button {
 }
 
 div[data-depth] {
-  padding-left: calc(attr(data-depth type(<number>)) * 10px);
+    padding-left: calc(attr(data-depth type(<number>)) * 10px);
+}
+
+.filter-instructions {
+    margin: 5%;
+    font-size: 20px;
+}
+
+.filter-instructions p {
+    margin-left: 5px; 
+}
+
+.filter-instructions ul {
+    margin-left: 5px; 
 }

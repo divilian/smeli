@@ -115,6 +115,18 @@ function SearchFilter (){
                 </div>
             </div>
             <div class="right-block">
+                <div class="filter-instructions">
+                    <h3>Filtering Instructions:</h3>
+                    <p>Enter criteria into the input field and hit "Enter" or press "Add Criteria" button. Up and Down arrow keys can be used to quickly switch criteria being added</p>
+                    <p>Filtering is case in-sensitive and currently supports a few comparing operations:</p>
+                    <ul>
+                        <li>{"<"}</li>
+                        <li>{"<="}</li>
+                        <li>{">"}</li>
+                        <li>{">="}</li>
+                    </ul>
+                    <p>These work best with number based fields, but do technically work with any field.</p>
+                </div>
             </div>
         </div>
     )

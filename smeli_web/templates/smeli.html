@@ -56,8 +56,9 @@ function handleParam() {
 async function lookup() {
     let queryString = "?"
     for (const [param, value] of Object.entries(searchParams)) {
-        queryString += param.toLowerCase() + "=" + value.replaceAll(" ", "+")
+        queryString += param.toLowerCase() + "=" + value.replaceAll(" ", "+") + "&";
     }
+
 
     let resultsPage= document.createElement('a');
     resultsPage.target= '_blank';
