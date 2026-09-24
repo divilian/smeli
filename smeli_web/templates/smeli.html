@@ -59,25 +59,10 @@ async function lookup() {
         queryString += param.toLowerCase() + "=" + value.replaceAll(" ", "+")
     }
 
-    const loadingDiv = document.getElementById("loading-results");
-    loadingDiv.classList.remove("hidden");
-
-    const canPromise = await fetch(`/api/lookup${queryString}`);
-    const candidates = await canPromise.json();
-
-    const resultsDiv = document.getElementById("results");
-    for (let i = 0; i < candidates.length; i++) {
-        let newResult = document.createElement("div");
-        newResult.innerHTML = `
-            <h4>${i + 1}. ${candidates[i]['title']} [relevance: ${candidates[i]['score']}, cites: ${candidates[i]['citation_score']}] </h4>
-            <p>${candidates[i]['authors']} (${candidates[i]['year']})</p>
-            <p>URL: <a href="${candidates[i]['url']}" target="_blank">${candidates[i]['url']}</a></p>
-            <br>
-        `;
-        resultsDiv.appendChild(newResult);
-    }
-    loadingDiv.classList.add("hidden");
-
+    let resultsPage= document.createElement('a');
+    resultsPage.target= '_blank';
+    resultsPage.href= `{{ url_for('search_filter') }}${queryString}`;
+    resultsPage.click();
 }
 
 </script>

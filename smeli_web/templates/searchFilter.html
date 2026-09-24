@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block js %}
+{% endblock %}
+{% block title %}
+SMeLI Results
+{% endblock %}
+{% block content %}
+<div id="container"></div>
+<script type="module" src="{{ vite_asset('src/searchfilter.jsx') }}"></script>
+{% endblock %}

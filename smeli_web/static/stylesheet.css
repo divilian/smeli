@@ -116,3 +116,13 @@ button {
 
 .param-button > span {
 }
+
+
+/* Search Filter */
+.choosen {
+    color: #55BB55;
+}
+
+div[data-depth] {
+  padding-left: calc(attr(data-depth type(<number>)) * 10px);
+}

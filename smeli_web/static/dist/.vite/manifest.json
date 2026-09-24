@@ -1,0 +1,48 @@
+{
+  "_jsx-runtime-DIhQqKhG.js": {
+    "file": "assets/jsx-runtime-DIhQqKhG.js",
+    "name": "jsx-runtime"
+  },
+  "src/filterinput.jsx": {
+    "file": "assets/filterinput-C5G6wB2h.js",
+    "name": "filterinput",
+    "src": "src/filterinput.jsx",
+    "isEntry": true,
+    "imports": [
+      "_jsx-runtime-DIhQqKhG.js"
+    ]
+  },
+  "src/history.jsx": {
+    "file": "assets/history-CPHLbGcM.js",
+    "name": "history",
+    "src": "src/history.jsx",
+    "isEntry": true,
+    "imports": [
+      "_jsx-runtime-DIhQqKhG.js"
+    ]
+  },
+  "src/resultcard.jsx": {
+    "file": "assets/resultcard-DLgEFqGZ.js",
+    "name": "resultcard",
+    "src": "src/resultcard.jsx",
+    "isEntry": true,
+    "imports": [
+      "_jsx-runtime-DIhQqKhG.js"
+    ]
+  },
+  "src/searchfilter.jsx": {
+    "file": "assets/searchfilter-D5s5EZGY.js",
+    "name": "searchfilter",
+    "src": "src/searchfilter.jsx",
+    "isEntry": true,
+    "imports": [
+      "_jsx-runtime-DIhQqKhG.js",
+      "src/resultcard.jsx",
+      "src/resultcard.jsx",
+      "src/filterinput.jsx",
+      "src/filterinput.jsx",
+      "src/history.jsx",
+      "src/history.jsx"
+    ]
+  }
+}

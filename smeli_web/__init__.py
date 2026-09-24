@@ -1,6 +1,8 @@
 from flask import Flask
 smeli_app = Flask(__name__)
 from smeli_web import routes
+from pathlib import Path
+import json
 
 VITE_MANIFEST_PATH = (
         Path(smeli_app.static_folder)
