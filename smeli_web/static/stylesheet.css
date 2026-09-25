@@ -19,6 +19,10 @@ button {
     display: none;
 }
 
+.bold {
+    font-weight: bold;
+}
+
 .banner {
     display: block;
     width: auto;
@@ -116,3 +120,64 @@ button {
 
 .param-button > span {
 }
+
+
+/* Search Filter */
+.branch {
+    margin-top: 5px;
+    font-size: 20px;
+}
+
+.choosen {
+    color: #70e67e;
+}
+
+div[data-depth] {
+    padding-left: calc(attr(data-depth type(<number>)) * 10px);
+}
+
+.filter-instructions {
+    margin: 5%;
+    font-size: 20px;
+}
+
+.filter-instructions p {
+    margin-left: 5px; 
+}
+
+.filter-instructions ul {
+    margin-left: 5px; 
+}
+
+.filter-instructions h3 {
+    color: #70e67e;
+}
+
+.result-card {
+    margin: 5px;
+    padding: 5px;
+    border: 1px ridge #55BB55;
+    font-size: 18px;
+}
+
+.result-card a {
+    color: #FF3090;
+}
+
+.result-title {
+    font-weight: bold;
+}
+
+.title-title {
+    color: #d14343;
+}
+
+.result-authors {
+    color: #CC8000;
+}
+
+.result-date {
+    color: #8F8FEF;
+}
+
+
