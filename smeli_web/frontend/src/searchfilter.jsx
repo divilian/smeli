@@ -117,8 +117,8 @@ function SearchFilter (){
             <div class="right-block">
                 <div class="filter-instructions">
                     <h3>Filtering Instructions:</h3>
-                    <p>Enter criteria into the input field and hit "Enter" or press "Add Criteria" button. Up and Down arrow keys can be used to quickly switch criteria being added</p>
-                    <p>Filtering is case in-sensitive and currently supports a few comparing operations:</p>
+                    <p>Enter criteria into the input field and hit "Enter" or press "Add Criteria" button. Up and Down arrow keys can be used to quickly switch criteria being added.</p>
+                    <p>Filtering is case in-sensitive and currently supports a few comparing operations. These must be used at the beginning and have a space in between them and the criteria:</p>
                     <ul>
                         <li>{"<"}</li>
                         <li>{"<="}</li>
@@ -126,6 +126,10 @@ function SearchFilter (){
                         <li>{">="}</li>
                     </ul>
                     <p>These work best with number based fields, but do technically work with any field.</p>
+                    <h3>Brancing Instructions:</h3>
+                    <p>On the left part of the page, you will see all the filters you have put in and what filters they built off of.</p>
+                    <p>When adding a criteria, all previous criteria on the branch you are on are also checked, so staying on a branch means you can only narrow your search, not expand.</p>
+                    <p>By clicking on a past filter, you are brought to a previous collection of results. You can use this context to narrow your search in a different direction.</p>
                 </div>
             </div>
         </div>
