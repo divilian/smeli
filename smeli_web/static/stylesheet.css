@@ -180,4 +180,15 @@ div[data-depth] {
     color: #8F8FEF;
 }
 
+.pagination {
+    margin-left: 10%;
+    margin-right: 10%;
+    gap: 1%;
+    display: flex;
+}
 
+.pagination-button {
+    aspect-ratio: 1 / 1;
+    width: 100%;
+    font-size: 18px; 
+}

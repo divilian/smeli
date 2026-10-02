@@ -30,16 +30,31 @@ function getPathParams(history, path) {
     return choices;
 }
 
+function PageButton({setPage, pageNum}) {
+    
+
+    return (
+        <button class="pagination-button" onClick={() => setPage(pageNum)}>{pageNum + 1}</button>
+    );
+}
+
 function SearchFilter (){
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState("");
     const [curParam, setCurParam] = useState({});
     const [curPath, setPath] = useState([]);
     const [history, setHistory] = useState([]);
+    const [page, setPage] = useState(0);
+    const [numShown, setNumShown] = useState(0);
+    const [pageCount, setPageCount] = useState(0);
+
+    const PAGE_LENGTH = 10;
 
     function finishLoading(data) {
         setResults( data );
         setLoading( "hidden" );
+        setNumShown( data.length );
+        setPageCount( Math.ceil(data.length / PAGE_LENGTH) );
     }
 
     function newFilter(param) {
@@ -96,6 +111,8 @@ function SearchFilter (){
             .then(res => res.json())
             .then(data => finishLoading(data));
         }, []);
+
+
     return (
         <div class="centered-block" id="centered-block">
             <div class="left-block">
@@ -112,8 +129,17 @@ function SearchFilter (){
                     </div>
                     <div id="results">
                         { results.map((result, index) => (
-                            <ResultCard data={result} index={index} curParam={curParam}/>
+                            <ResultCard data={result} index={index} curParam={curParam} page={page} pageLength={PAGE_LENGTH}/>
                         )) }
+                    </div>
+                    <div id="pagination" class="pagination">
+                        {Array.from({ length: pageCount }, (_, pageNum) => (
+                            <PageButton
+                                key={pageNum}
+                                setPage={setPage}
+                                pageNum={pageNum}
+                            />
+                        ))}
                     </div>
                 </div>
             </div>

@@ -47,7 +47,7 @@ function matchesParam(data, param, originalShow) {
         .includes(rawValue.toLowerCase());
 }
 
-export default function ResultCard( {data, index, curParam} ) {
+export default function ResultCard( {data, index, curParam, page, pageLength} ) {
 
     const [show, setShow] = useState("");
 
@@ -60,8 +60,10 @@ export default function ResultCard( {data, index, curParam} ) {
         setShow(matchesParam(data, curParam, show) ? "" : "hidden");
     }, [curParam, data, show]);
 
+    const inPage = index >= page * pageLength && index < (page + 1) * pageLength;
+
     return (
-        <div className={`result-card ${show}`}>
+        <div className={`result-card ${show} ${inPage ? "" : "hidden"}`}>
             <div class="result-title">
                 <span class="title-index">{index + 1}.&nbsp;</span> 
                 <span class="title-title">{data.title}&nbsp;</span>
