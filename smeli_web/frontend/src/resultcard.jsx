@@ -18,19 +18,27 @@ function matchesParam(data, param, originalShow) {
     const check = data[param.type];
 
     if (rawValue.includes(">=")) {
-        return check >= rawValue.split(" ", 2)[1];
+        let value = rawValue.substring( rawValue.indexOf(">=") + 2 ).trim(); 
+        return check >= value;
+        //return check >= rawValue.split(" ", 2)[1];
     }
 
     if (rawValue.includes("<=")) {
-        return check <= rawValue.split(" ", 2)[1];
+        let value = rawValue.substring( rawValue.indexOf("<=") + 2 ).trim(); 
+        return check <= value;
+        //return check <= rawValue.split(" ", 2)[1];
     }
 
     if (rawValue.includes(">")) {
-        return check > rawValue.split(" ", 2)[1];
+        let value = rawValue.substring( rawValue.indexOf(">") + 1 ).trim(); 
+        return check > value;
+        //return check > rawValue.split(" ", 2)[1];
     }
 
     if (rawValue.includes("<")) {
-        return check < rawValue.split(" ", 2)[1];
+        let value = rawValue.substring( rawValue.indexOf("<") + 1 ).trim(); 
+        return check < value;
+        //return check < rawValue.split(" ", 2)[1];
     }
 
     return data[param.type]
