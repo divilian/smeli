@@ -7,10 +7,14 @@ export default function FilterInput({ newParam }) {
     const [value, setValue] = useState("");
     const [selected, setSelected] = useState(0);
 
+    function handleClick() {
+        newParam({ type: params[selected].toLowerCase(), value });
+        setValue( "" );
+    }
+
     function handleKeyDown (event) {
         if (event.key === "Enter") {
             newParam({ type: params[selected].toLowerCase(), value });
-            console.log({ type: params[selected].toLowerCase(), value });
             setValue( "" );
         }
         else if (event.key === "ArrowUp") {
@@ -41,6 +45,7 @@ export default function FilterInput({ newParam }) {
                 ))}
             </select>
             <input autoFocus type="text" placeholder="Enter a Value..." onKeyDown={handleKeyDown} value={value} onChange={ (e) => setValue(e.target.value) }/>
+            <button onClick={ (e) => handleClick() }>Add Criteria</button>
         </div>
     );
 

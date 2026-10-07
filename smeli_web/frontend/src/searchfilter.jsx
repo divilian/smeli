@@ -30,16 +30,97 @@ function getPathParams(history, path) {
     return choices;
 }
 
+function matchesParam(data, param) {
+    if (param.type === "branch") {
+        return param.choices.every(choice => matchesParam(data, choice));
+    }
+
+    if (!(param.type in data) || data[param.type] == null) {
+        return true;
+    }
+
+    const rawValue = param.value;
+    const check = data[param.type];
+
+    if (rawValue.includes(">=")) {
+        let value = rawValue.substring( rawValue.indexOf(">=") + 2 ).trim(); 
+        return check >= value;
+        //return check >= rawValue.split(" ", 2)[1];
+    }
+
+    if (rawValue.includes("<=")) {
+        let value = rawValue.substring( rawValue.indexOf("<=") + 2 ).trim(); 
+        return check <= value;
+        //return check <= rawValue.split(" ", 2)[1];
+    }
+
+    if (rawValue.includes(">")) {
+        let value = rawValue.substring( rawValue.indexOf(">") + 1 ).trim(); 
+        return check > value;
+        //return check > rawValue.split(" ", 2)[1];
+    }
+
+    if (rawValue.includes("<")) {
+        let value = rawValue.substring( rawValue.indexOf("<") + 1 ).trim(); 
+        return check < value;
+        //return check < rawValue.split(" ", 2)[1];
+    }
+
+    return data[param.type]
+        .toString()
+        .toLowerCase()
+        .includes(rawValue.toLowerCase());
+}
+
+function PageButton({setPage, pageNum}) {
+    
+
+    return (
+        <button class="pagination-button" onClick={() => setPage(pageNum)}>{pageNum + 1}</button>
+    );
+}
+
 function SearchFilter (){
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState("");
-    const [curParam, setCurParam] = useState({});
+    //const [curParam, setCurParam] = useState({});
     const [curPath, setPath] = useState([]);
     const [history, setHistory] = useState([]);
+    const [page, setPage] = useState(0);
+    const [numShown, setNumShown] = useState(0);
+    const [pageCount, setPageCount] = useState(0);
+    const [shownCards, setShownCards] = useState([]);
+
+    const PAGE_LENGTH = 10;
 
     function finishLoading(data) {
+        for (let i = 0; i < data.length; i++ ){
+            data[i]['index'] = i;
+        }
         setResults( data );
+        setShownCards( data );
         setLoading( "hidden" );
+        setNumShown( data.length );
+        setPageCount( Math.ceil(data.length / PAGE_LENGTH) );
+    }
+
+    function reviewShown(param) {
+        let updatedShown = [];
+        let workingList = [];
+        if (param.type === "branch") {
+            workingList = results;
+        }
+        else {
+            workingList = shownCards
+        }
+        for (let i = 0; i < workingList.length; i++ ){
+            if ( matchesParam( workingList[i], param ) ) {
+                updatedShown.push( workingList[i] );
+            }
+        }
+        setNumShown( updatedShown.length );
+        setPageCount( Math.ceil(updatedShown.length / PAGE_LENGTH) );
+        setShownCards( updatedShown );
     }
 
     function newFilter(param) {
@@ -58,7 +139,8 @@ function SearchFilter (){
             ]);
 
             setPath([newIndex]);
-            setCurParam(param);
+            reviewShown(param);
+            //setCurParam(param);
             return;
         }
 
@@ -74,9 +156,11 @@ function SearchFilter (){
 
         branch.branches.push(newBranch);
 
+        console.log(newHistory);
         setHistory(newHistory);
         setPath([...curPath, newIndex]);
-        setCurParam(param);
+        //setCurParam(param);
+        reviewShown(param);
     }
 
 
@@ -84,7 +168,8 @@ function SearchFilter (){
         setPath(pathToChange);
 
         let choices = getPathParams(history, pathToChange);
-        setCurParam({"type":"branch", choices});
+        //setCurParam({"type":"branch", choices});
+        reviewShown({"type":"branch", choices});
         
         return;
     }
@@ -96,10 +181,14 @@ function SearchFilter (){
             .then(data => finishLoading(data));
         }, []);
 
+
     return (
         <div class="centered-block" id="centered-block">
             <div class="left-block">
-                <History update={updatePath} path={curPath} history={history} />
+                <div class="history-container">
+                    <p>Filter History</p>
+                    <History update={updatePath} path={curPath} history={history} />
+                </div>
             </div>
             <div class="middle-block">
                 <FilterInput newParam={ newFilter } />
@@ -108,9 +197,18 @@ function SearchFilter (){
                         Loading Candidates...
                     </div>
                     <div id="results">
-                        { results.map((result, index) => (
-                            <ResultCard data={result} index={index} curParam={curParam}/>
+                        { /*results*/ shownCards.map((result, index) => (
+                            <ResultCard data={result} index={index} /*curParam={curParam}*/ page={page} pageLength={PAGE_LENGTH}/>
                         )) }
+                    </div>
+                    <div id="pagination" class="pagination">
+                        {Array.from({ length: pageCount }, (_, pageNum) => (
+                            <PageButton
+                                key={ pageNum}
+                                setPage={setPage}
+                                pageNum={pageNum}
+                            />
+                        ))}
                     </div>
                 </div>
             </div>
@@ -126,7 +224,7 @@ function SearchFilter (){
                         <li>{">="}</li>
                     </ul>
                     <p>These work best with number based fields, but do technically work with any field.</p>
-                    <h3>Brancing Instructions:</h3>
+                    <h3>Branching Instructions:</h3>
                     <p>On the left part of the page, you will see all the filters you have put in and what filters they built off of.</p>
                     <p>When adding a criteria, all previous criteria on the branch you are on are also checked, so staying on a branch means you can only narrow your search, not expand.</p>
                     <p>By clicking on a past filter, you are brought to a previous collection of results. You can use this context to narrow your search in a different direction.</p>
