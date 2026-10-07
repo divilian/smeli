@@ -2,6 +2,7 @@ import React from "react";
 import { useEffect, useState } from "react";
 
 
+/*
 function matchesParam(data, param, originalShow) {
     if (param.type === "branch") {
         return param.choices.every(choice => matchesParam(data, choice));
@@ -46,11 +47,12 @@ function matchesParam(data, param, originalShow) {
         .toLowerCase()
         .includes(rawValue.toLowerCase());
 }
+*/
 
-export default function ResultCard( {data, index, curParam, page, pageLength} ) {
+export default function ResultCard( {data, index, /*curParam,*/ page, pageLength} ) {
 
+/*
     const [show, setShow] = useState("");
-
     useEffect(() => {
         if (curParam.type === "reset") {
             setShow("");
@@ -59,13 +61,16 @@ export default function ResultCard( {data, index, curParam, page, pageLength} ) 
 
         setShow(matchesParam(data, curParam, show) ? "" : "hidden");
     }, [curParam, data, show]);
+*/
 
     const inPage = index >= page * pageLength && index < (page + 1) * pageLength;
 
+    //${show} ||||| {index + 1}
+    
     return (
-        <div className={`result-card ${show} ${inPage ? "" : "hidden"}`}>
+        <div className={`result-card ${inPage ? "" : "hidden"}`}>
             <div class="result-title">
-                <span class="title-index">{index + 1}.&nbsp;</span> 
+                <span class="title-index">{data.index + 1}.&nbsp;</span> 
                 <span class="title-title">{data.title}&nbsp;</span>
                 <span class="title-relevance">
                     [relevance: {data.score}, cites: {data.citation_score}]

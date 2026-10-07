@@ -30,6 +30,48 @@ function getPathParams(history, path) {
     return choices;
 }
 
+function matchesParam(data, param) {
+    if (param.type === "branch") {
+        return param.choices.every(choice => matchesParam(data, choice));
+    }
+
+    if (!(param.type in data) || data[param.type] == null) {
+        return true;
+    }
+
+    const rawValue = param.value;
+    const check = data[param.type];
+
+    if (rawValue.includes(">=")) {
+        let value = rawValue.substring( rawValue.indexOf(">=") + 2 ).trim(); 
+        return check >= value;
+        //return check >= rawValue.split(" ", 2)[1];
+    }
+
+    if (rawValue.includes("<=")) {
+        let value = rawValue.substring( rawValue.indexOf("<=") + 2 ).trim(); 
+        return check <= value;
+        //return check <= rawValue.split(" ", 2)[1];
+    }
+
+    if (rawValue.includes(">")) {
+        let value = rawValue.substring( rawValue.indexOf(">") + 1 ).trim(); 
+        return check > value;
+        //return check > rawValue.split(" ", 2)[1];
+    }
+
+    if (rawValue.includes("<")) {
+        let value = rawValue.substring( rawValue.indexOf("<") + 1 ).trim(); 
+        return check < value;
+        //return check < rawValue.split(" ", 2)[1];
+    }
+
+    return data[param.type]
+        .toString()
+        .toLowerCase()
+        .includes(rawValue.toLowerCase());
+}
+
 function PageButton({setPage, pageNum}) {
     
 
@@ -41,20 +83,44 @@ function PageButton({setPage, pageNum}) {
 function SearchFilter (){
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState("");
-    const [curParam, setCurParam] = useState({});
+    //const [curParam, setCurParam] = useState({});
     const [curPath, setPath] = useState([]);
     const [history, setHistory] = useState([]);
     const [page, setPage] = useState(0);
     const [numShown, setNumShown] = useState(0);
     const [pageCount, setPageCount] = useState(0);
+    const [shownCards, setShownCards] = useState([]);
 
     const PAGE_LENGTH = 10;
 
     function finishLoading(data) {
+        for (let i = 0; i < data.length; i++ ){
+            data[i]['index'] = i;
+        }
         setResults( data );
+        setShownCards( data );
         setLoading( "hidden" );
         setNumShown( data.length );
         setPageCount( Math.ceil(data.length / PAGE_LENGTH) );
+    }
+
+    function reviewShown(param) {
+        let updatedShown = [];
+        let workingList = [];
+        if (param.type === "branch") {
+            workingList = results;
+        }
+        else {
+            workingList = shownCards
+        }
+        for (let i = 0; i < workingList.length; i++ ){
+            if ( matchesParam( workingList[i], param ) ) {
+                updatedShown.push( workingList[i] );
+            }
+        }
+        setNumShown( updatedShown.length );
+        setPageCount( Math.ceil(updatedShown.length / PAGE_LENGTH) );
+        setShownCards( updatedShown );
     }
 
     function newFilter(param) {
@@ -73,7 +139,8 @@ function SearchFilter (){
             ]);
 
             setPath([newIndex]);
-            setCurParam(param);
+            reviewShown(param);
+            //setCurParam(param);
             return;
         }
 
@@ -92,7 +159,8 @@ function SearchFilter (){
         console.log(newHistory);
         setHistory(newHistory);
         setPath([...curPath, newIndex]);
-        setCurParam(param);
+        //setCurParam(param);
+        reviewShown(param);
     }
 
 
@@ -100,7 +168,8 @@ function SearchFilter (){
         setPath(pathToChange);
 
         let choices = getPathParams(history, pathToChange);
-        setCurParam({"type":"branch", choices});
+        //setCurParam({"type":"branch", choices});
+        reviewShown({"type":"branch", choices});
         
         return;
     }
@@ -128,14 +197,14 @@ function SearchFilter (){
                         Loading Candidates...
                     </div>
                     <div id="results">
-                        { results.map((result, index) => (
-                            <ResultCard data={result} index={index} curParam={curParam} page={page} pageLength={PAGE_LENGTH}/>
+                        { /*results*/ shownCards.map((result, index) => (
+                            <ResultCard data={result} index={index} /*curParam={curParam}*/ page={page} pageLength={PAGE_LENGTH}/>
                         )) }
                     </div>
                     <div id="pagination" class="pagination">
                         {Array.from({ length: pageCount }, (_, pageNum) => (
                             <PageButton
-                                key={pageNum}
+                                key={ pageNum}
                                 setPage={setPage}
                                 pageNum={pageNum}
                             />

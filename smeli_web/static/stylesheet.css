@@ -185,10 +185,12 @@ div[data-depth] {
     margin-right: 10%;
     gap: 1%;
     display: flex;
+    justify-content: center;
 }
 
 .pagination-button {
     aspect-ratio: 1 / 1;
     width: 100%;
+    max-width: 30px;
     font-size: 18px; 
 }
