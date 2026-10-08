@@ -9,7 +9,9 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
     </head>
     <body>
-        <img class="banner" src="{{ url_for('static', filename='banner.png') }}">
+        <a href="{{ url_for('index') }}">
+            <img class="banner" src="{{ url_for('static', filename='banner.png') }}">
+        </a>
         {% block content %}
         {% endblock %}
     </body>

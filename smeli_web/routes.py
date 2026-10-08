@@ -5,7 +5,7 @@ from smeli.sources import get_paper_candidates
 
 @smeli_app.route("/")
 def index():
-    return render_template("info.html")
+    return render_template("smeli.html")
 
 @smeli_app.route("/smeli")
 def smeli():
