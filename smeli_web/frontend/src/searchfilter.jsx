@@ -119,7 +119,9 @@ function SearchFilter (){
             }
         }
         setNumShown( updatedShown.length );
-        setPageCount( Math.ceil(updatedShown.length / PAGE_LENGTH) );
+        let updatePC = Math.ceil(updatedShown.length / PAGE_LENGTH);
+        setPageCount( updatePC );
+        setPage( Math.min( updatePC, page ) ); 
         setShownCards( updatedShown );
     }
 
@@ -194,12 +196,35 @@ function SearchFilter (){
                 <FilterInput newParam={ newFilter } />
                 <div class="results-block">
                     <div id="loading-results" class={`loading ${ loading }`}>
-                        Loading Candidates...
+                        {Array.from({ length: PAGE_LENGTH }, (_) => (
+                            <div className="skeleton-card">
+                                <div className="skeleton-title">
+                                    <span className="skeleton-title-index"></span>
+                                    <span className="skeleton-title-title"></span>
+                                </div>
+
+                                <div className="result-authors">
+                                    <span className="skeleton-authors"></span>
+                                    <span className="skeleton-date"></span>
+                                </div>
+
+                                <div className="skeleton-extra">
+                                    <p><span className="skeleton-extra-key"></span></p>
+                                    <p><span className="skeleton-extra-key"></span></p>
+                                    <p><span className="skeleton-extra-key"></span></p>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                     <div id="results">
                         { /*results*/ shownCards.map((result, index) => (
                             <ResultCard data={result} index={index} /*curParam={curParam}*/ page={page} pageLength={PAGE_LENGTH}/>
                         )) }
+                        { shownCards.length == 0 && loading !== "" ? (
+                            <div class={`loading`}>
+                                No results found.
+                            </div>
+                        ) : (null)}
                     </div>
                     <div id="pagination" class="pagination">
                         {Array.from({ length: pageCount }, (_, pageNum) => (

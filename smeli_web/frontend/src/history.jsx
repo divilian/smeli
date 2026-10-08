@@ -59,10 +59,21 @@ export default function History({ update, path, history }) {
         );*/
     }
 //{renderPath(path, history, 0)}
+    const [initParams, setParams] = useState(0);
+    if (initParams == 0) {
+        const searchParams = new URLSearchParams(window.location.search);
+        let initialParams = "";
+        for (const [key, value] of searchParams.entries()) {
+            initialParams += key + ": " + value + ",";
+        }
+        setParams(initialParams.slice(0, -1));
+
+    }
+
     return (
         <div>
             <div class="branch bold choosen" data-depth="1" onClick={() => update([])}>
-                Initial Search
+                |- {initParams}
             </div>
             <div class="previous-paths">
                 {history.map((branch, index) => (

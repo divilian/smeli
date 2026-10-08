@@ -75,7 +75,6 @@ button {
 
 .search-type {
     padding-right: 1%;
-    padding-top: 4px;
     padding-bottom: 0px;
     height: 22px;
     width: 20%;
@@ -89,7 +88,6 @@ button {
 
 .submit-parameter {
     display: inline;
-    padding-top: 4px;
     padding-left: 1%;
     height: 22px;
     width: 26%;
@@ -126,6 +124,10 @@ button {
 .branch {
     margin-top: 5px;
     font-size: 20px;
+}
+
+.branch:hover {
+    cursor: pointer;
 }
 
 .choosen {
@@ -193,4 +195,84 @@ div[data-depth] {
     width: 100%;
     max-width: 30px;
     font-size: 18px; 
+}
+
+
+/* Skeleton Buisness */
+.skeleton-card {
+    border-bottom: 1px solid #e5e7eb;
+    margin: 5px;
+    padding: 5px;
+    border: 1px ridge #55BB55;
+    font-size: 18px;
+}
+
+/* Solid skeleton color */
+.skeleton-card .skeleton-title-index,
+.skeleton-card .skeleton-title-title,
+.skeleton-card .skeleton-title-relevance,
+.skeleton-card .skeleton-authors,
+.skeleton-card .skeleton-date,
+.skeleton-card .skeleton-extra-key {
+    display: inline-block;
+    background: #808182;
+    border-radius: 4px;
+}
+
+/* Title */
+.skeleton-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.skeleton-title-index {
+    width: 24px;
+    height: 18px;
+}
+
+.skeleton-title-title {
+    width: 55%;
+    height: 20px;
+}
+
+.skeleton-title-relevance {
+    width: 140px;
+    height: 16px;
+    margin-left: auto;
+}
+
+/* Authors / date */
+.result-authors {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 14px;
+}
+
+.skeleton-authors {
+    width: 180px;
+    height: 14px;
+}
+
+.skeleton-date {
+    width: 70px;
+    height: 14px;
+}
+
+/* Extra fields */
+.skeleton-extra {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.skeleton-extra p {
+    margin: 0;
+}
+
+.skeleton-extra-key {
+    width: 35%;
+    height: 14px;
 }
